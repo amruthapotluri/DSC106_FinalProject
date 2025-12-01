@@ -327,13 +327,13 @@
                 lucide.createIcons();
             };
 
-            if (hour === 0) addTooltip(`Midnight in ${state.season}.`, "top-0 left-10 md:left-1/4");
+            if (hour === 0 && state.season !== "Summer") addTooltip(`Midnight in ${state.season}.`, "top-0 left-1/2 -translate-x-1/2");
             if (state.season === "Winter" && hour === 12) {
-                addTooltip("Even at noon, the sun barely rises. This is the Polar Night.", "bottom-1/4 left-10 md:left-1/3");
+                addTooltip("Even at noon, the sun barely rises. This is the Polar Night.", "top-0 left-1/2 -translate-x-1/2");
             } else if (state.season === "Summer" && hour === 0) {
-                 addTooltip("The Midnight Sun. The sun remains visible even at midnight.", "top-1/4 right-10 md:right-1/3");
-            } else if (hour === 12) {
-                addTooltip("Noon. Peak daily brightness.", "bottom-1/4 left-10 md:left-1/3");
+                 addTooltip("The Midnight Sun. The sun remains visible even at midnight.", "top-0 left-1/2 -translate-x-1/2");
+            } else if (hour === 12 && state.season !== "Winter") {
+                addTooltip("Noon. Peak daily brightness.", "top-0 left-1/2 -translate-x-1/2");
             }
         }
 
