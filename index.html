@@ -32,6 +32,8 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -46,6 +48,7 @@
         <div id="clouds-layer" class="absolute inset-0 pointer-events-none mix-blend-overlay transition-opacity duration-1000" 
              style="background: repeating-linear-gradient(45deg, transparent, transparent 100px, rgba(255,255,255,0.1) 100px, rgba(255,255,255,0.1) 200px);">
         </div>
+        <div id="cloud-visual-container"></div>
         <div class="absolute inset-0 flex items-end justify-center pb-20 pointer-events-none">
             <div id="celestial-body" class="relative w-[150vw] h-[150vw] rounded-full border border-white/5 transition-transform duration-75 linear origin-center">
                 <div class="absolute top-1/2 -right-12 w-24 h-24 bg-yellow-300 rounded-full blur-xl shadow-[0_0_100px_rgba(253,224,71,0.6)]"></div>
@@ -308,7 +311,7 @@
                 sun.style.opacity = 1;
                 sun.style.transform = `rotate(${rotation}deg)`;
             }
-            document.getElementById("clouds-layer").style.opacity = stats.cloud / 100;
+            updateCloudsDensity(stats.cloud);
             const h = Math.floor(t);
             const m = Math.floor((t - h) * 60);
             document.getElementById("time-display").innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -404,7 +407,107 @@
                 </div>
               `;
               lucide.createIcons();
+
           });
+
+        // Cloud functions
+        let cloudsArray = [];
+        let cloudTargetPercent = 50;
+        function generateClouds(initialPercent = 50) {
+            const layer = document.getElementById("clouds-layer");
+            layer.innerHTML = '';
+            cloudsArray = [];
+            cloudTargetPercent = initialPercent;    
+            const norm = normalizeCloudPercent(cloudTargetPercent);
+            const {numClouds} = getCloudCount(norm);
+
+            for (let i = 0; i < numClouds; i++) {
+                const cloud = createCloud(norm);
+                layer.appendChild(cloud);
+                cloudsArray.push(cloud);
+            }
+        }
+        function createCloud(norm) {
+            const cloud = document.createElement("div");
+            cloud.className = "absolute cloud";
+            cloud.style.position = "absolute";
+            cloud.style.top = Math.random() * 70 + "%";
+            cloud.style.left = Math.random() * 100 + "%";
+            cloud.dataset.speed = (0.001 + Math.random() * 0.005) * (0.5 + norm);
+            cloud.style.opacity = 0.1 + norm * 0.6;
+            const numCircles = 5 + Math.floor(Math.random() * 3);
+            const baseWidth = 80 + Math.random() * 120;
+            const baseHeight = 60 + Math.random() * 40;
+            const mid = (numCircles - 1) / 2;
+
+            for (let j = 0; j < numCircles; j++) {
+                const circle = document.createElement("div");
+                const distanceFromMid = Math.abs(j - mid);
+                const sizeFactor = 1 - distanceFromMid / mid * 0.5;
+                const widthFactor = (0.8 + 0.4 * sizeFactor) * (0.9 + 0.1 * norm);
+                const heightFactor = (0.8 + 0.8 * sizeFactor) * (0.9 + 0.4 * norm);
+                const w = baseWidth * widthFactor * (0.9 + Math.random() * 0.2);
+                const h = baseHeight * heightFactor * (0.9 + Math.random() * 0.2);
+                circle.style.width = w + "px";
+                circle.style.height = h + "px";
+                circle.style.background = "white";
+                circle.style.borderRadius = "50%";
+                circle.style.position = "absolute";
+                circle.style.left = (j * baseWidth * 0.35) + "px";
+                const baseline = baseHeight;
+                const verticalOffset = baseline - h;
+                circle.style.top = verticalOffset + "px";
+                circle.style.filter = `blur(${2 + Math.random() * 3}px)`;
+                cloud.appendChild(circle);
+            }
+            return cloud;
+        }
+        let lastTime = Date.now();
+        function animateClouds() {
+            const now = Date.now();
+            const delta = (now - lastTime) / 16.67; // ~normalize to 60fps
+            lastTime = now;
+            cloudsArray.forEach(cloud => {
+                let left = parseFloat(cloud.style.left);
+                left += parseFloat(cloud.dataset.speed) * delta;
+                if (left > 100) left = -cloud.offsetWidth / window.innerWidth * 100;
+                cloud.style.left = left + "%";
+            const scale = 0.95 + 0.1 * Math.sin(Date.now() / 2000);
+            cloud.style.transform = `scale(${scale})`;
+        });
+            requestAnimationFrame(animateClouds);
+        }
+        function updateCloudsDensity(cloudPercent) {
+            cloudTargetPercent = cloudPercent;
+            const norm = normalizeCloudPercent(cloudTargetPercent);
+            const {numClouds} = getCloudCount(norm);
+            cloudsArray.forEach(cloud => {
+                cloud.style.opacity = 0.1 + norm * 0.6;
+                cloud.dataset.speed = (0.001 + Math.random() * 0.005) * (0.5 + norm);
+            });
+            while (cloudsArray.length < numClouds) {
+                const cloud = createCloud(norm);
+                document.getElementById("clouds-layer").appendChild(cloud);
+                cloudsArray.push(cloud);
+            }
+            while (cloudsArray.length > numClouds) {
+                const cloud = cloudsArray.pop();
+                cloud.remove();
+            }
+        }
+        function normalizeCloudPercent(cloudPercent) {
+            const min = 45;
+            const max = 80;
+            return Math.min(Math.max((cloudPercent - min) / (max - min), 0), 1);
+        }
+        function getCloudCount(norm) {
+            const minClouds = 3;
+            const maxClouds = 20;
+            return { numClouds: Math.round(minClouds + norm * (maxClouds - minClouds)) };
+        }
+
+        generateClouds();
+        animateClouds();
 
     </script>
 </body>
