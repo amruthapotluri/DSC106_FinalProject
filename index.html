@@ -301,16 +301,8 @@
             document.getElementById("app-container").style.backgroundColor = skyColor;
             let rotation = (t / 24) * 360 - 90;
             const sun = document.getElementById("celestial-body");
-            if(stats.daylight < 1) {
-                sun.style.opacity = 0.2; 
-                sun.style.transform = `rotate(90deg)`;
-            } else if (stats.daylight > 23) {
-                sun.style.opacity = 1;
-                sun.style.transform = `rotate(${rotation}deg)`; 
-            } else {
-                sun.style.opacity = 1;
-                sun.style.transform = `rotate(${rotation}deg)`;
-            }
+            sun.style.opacity = stats.daylight < 1 ? 0.2 : 1;
+            sun.style.transform = `rotate(${rotation}deg)`;
             updateCloudsDensity(stats.cloud);
             const h = Math.floor(t);
             const m = Math.floor((t - h) * 60);
