@@ -17,9 +17,18 @@
             50% { opacity: 0.3; transform: scale(0.8); }
         }
         .star { animation: twinkle 3s infinite ease-in-out; }
-        .tooltip { transition: opacity 0.5s ease, transform 0.5s ease; }
-        .tooltip.hidden { opacity: 0; transform: translateY(20px); pointer-events: none; }
-        .tooltip.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+        .tooltip {
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    pointer-events: none;
+}
+.tooltip.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+}
+.tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
         .modal { transition: opacity 0.3s ease, pointer-events 0.3s ease; }
         .modal.hidden-modal { opacity: 0; pointer-events: none; }
         .modal.visible-modal { opacity: 1; pointer-events: auto; }
@@ -32,8 +41,6 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -307,45 +314,151 @@
             const h = Math.floor(t);
             const m = Math.floor((t - h) * 60);
             document.getElementById("time-display").innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+            updateStars(h, state.season);
             updateTooltips(h);
         }
 
-        function updateTooltips(hour) {
+        // Tooltip functions
+        let tooltipTimer;
+        let currentTooltip = null;
+        let lastTooltipKey = null;
+        function showTooltip(text, posClass, key) {
+            if (lastTooltipKey === key) return; 
             const container = document.getElementById("tooltip-container");
-            container.innerHTML = ""; 
+            if (currentTooltip) {
+                currentTooltip.classList.replace("visible", "hidden");
+                clearTimeout(tooltipTimer);
+                setTimeout(() => currentTooltip?.remove(), 1500);
+            }
+            const div = document.createElement("div");
+            div.className = `absolute bg-black/80 backdrop-blur-md border border-yellow-400/30 text-yellow-50 p-4 rounded-lg shadow-2xl tooltip hidden ${posClass}`;
+            div.innerHTML = `
+                <div class="flex items-start space-x-3">
+                    <i data-lucide="info" class="text-yellow-400 shrink-0 w-4 h-4 mt-1"></i>
+                    <p class="text-sm leading-relaxed">${text}</p>
+                </div>
+            `;
+            container.appendChild(div);
+            lucide.createIcons();
+            requestAnimationFrame(() => div.classList.replace("hidden", "visible"));
+            currentTooltip = div;
+            lastTooltipKey = key;
+            tooltipTimer = setTimeout(() => {
+            div.classList.replace("visible", "hidden");
+            setTimeout(() => {
+                    if (currentTooltip === div) currentTooltip = null;
+                    div.remove();
+                }, 500);
+            }, 3000);
+        }
 
-            const addTooltip = (text, posClass) => {
-                const div = document.createElement("div");
-                div.className = `absolute bg-black/80 backdrop-blur-md border border-yellow-400/30 text-yellow-50 p-4 rounded-lg shadow-2xl max-w-xs tooltip visible ${posClass}`;
-                div.innerHTML = `<div class="flex items-start space-x-3"><i data-lucide="info" class="text-yellow-400 shrink-0 w-4 h-4 mt-1"></i><p class="text-sm leading-relaxed">${text}</p></div>`;
-                container.appendChild(div);
-                lucide.createIcons();
-            };
-
-            if (hour === 0 && state.season !== "Summer") addTooltip(`Midnight in ${state.season}.`, "top-0 left-1/2 -translate-x-1/2");
-            if (state.season === "Winter" && hour === 12) {
-                addTooltip("Even at noon, the sun barely rises. This is the Polar Night.", "top-0 left-1/2 -translate-x-1/2");
-            } else if (state.season === "Summer" && hour === 0) {
-                 addTooltip("The Midnight Sun. The sun remains visible even at midnight.", "top-0 left-1/2 -translate-x-1/2");
-            } else if (hour === 12 && state.season !== "Winter") {
-                addTooltip("Noon. Peak daily brightness.", "top-0 left-1/2 -translate-x-1/2");
+        function updateTooltips(hour) {
+            let key = `${state.season}-${hour}`;
+            if (hour === 0) {
+                if (state.season === "Summer") {
+                    showTooltip(
+                        "The Midnight Sun. In the Arctic summer, the sun never fully sets.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                } else if (state.season === "Winter") {
+                    showTooltip(
+                        "Polar Night. In winter, the sun stays below the horizon.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                } else if (state.season === "Spring") {
+                    showTooltip(
+                        "Midnight in spring. Daylight increases as the Arctic moves toward summer.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                } else if (state.season === "Fall") {
+                    showTooltip(
+                    "Midnight in fall. Daylight decreases as the Arctic moves toward winter.",
+                    "top-0 left-1/2 -translate-x-1/2",
+                    key
+                    );
+                }
+            }
+            if (hour === 12) {
+                if (state.season === "Winter") {
+                    showTooltip(
+                        "Even at noon during Polar Night, the sun barely rises above the horizon.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                } else if (state.season === "Summer") {
+                    showTooltip(
+                        "Noon under the Midnight Sun. The sun is high and the Arctic experiences continuous daylight.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                } else {
+                    showTooltip(
+                        "Noon. Maximum daily brightness.",
+                        "top-0 left-1/2 -translate-x-1/2",
+                        key
+                    );
+                }
+            }
+            if ((hour === 6 || hour === 18) && state.season !== "Summer" && state.season !== "Winter") {
+                showTooltip(
+                    hour === 6
+                        ? "Sunrise. The Arctic landscape begins to brighten."
+                        : "Sunset. The Arctic landscape starts to darken.",
+                    "top-0 left-1/2 -translate-x-1/2",
+                    key
+                );
+            }
+        const stats = getSeasonStats(state.location, state.season);
+            if (hour === 9 && stats.cloud > 60) {
+                showTooltip(
+                    "Morning clouds are dense, reducing surface brightness.",
+                    "top-0 left-1/2 -translate-x-1/2",
+                    key
+                );
+            }
+            if (hour === 15 && stats.brightness > 80) {
+                showTooltip(
+                    "Afternoon sun is strong, increasing surface brightness.",
+                    "top-0 left-1/2 -translate-x-1/2",
+                    key
+                );
             }
         }
+
+        let scrollPauseTimer;
+        window.addEventListener('scroll', () => {
+        const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+        state.scrollProgress = Math.min(Math.max(window.scrollY / totalHeight, 0), 1);
+        state.currentTime = state.scrollProgress * 24;
+        const hint = document.getElementById("scroll-hint");
+        hint.style.opacity = state.scrollProgress > 0.05 ? 0 : 1;
+        render();
+        clearTimeout(scrollPauseTimer);
+        scrollPauseTimer = setTimeout(() => {
+            updateTooltips(Math.floor(state.currentTime));
+            }, 500);
+        });
 
         window.addEventListener('scroll', () => {
             const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
             const progress = window.scrollY / totalHeight;
             state.scrollProgress = Math.min(Math.max(progress, 0), 1);
             state.currentTime = state.scrollProgress * 24;
-            
             const hint = document.getElementById("scroll-hint");
             if(state.scrollProgress > 0.05) hint.style.opacity = 0;
             else hint.style.opacity = 1;
-
             render();
         });
+        
+        
+        // Star functions
         function generateStars() {
             const layer = document.getElementById("stars-layer");
+            layer.innerHTML = "";
+            starsArray = [];
             for(let i=0; i<50; i++) {
                 const star = document.createElement("div");
                 star.className = "absolute bg-white rounded-full star";
@@ -358,6 +471,23 @@
                 layer.appendChild(star);
             }
         }
+        function updateStars(hour, season) {
+            const starsLayer = document.getElementById("stars-layer");
+            if (season === "Summer") {
+                starsLayer.style.opacity = (hour < 1 || hour > 23) ? 0.05 : 0;
+            } else {
+                let nightFactor = 0;
+                if (hour >= 18) nightFactor = (hour - 18) / 6;   
+                else if (hour < 6) nightFactor = (6 - hour) / 6;
+                nightFactor = Math.min(Math.max(nightFactor, 0), 1);
+                starsLayer.style.opacity = nightFactor;
+                starsArray.forEach(star => {
+                    star.style.opacity = 0.3 + 0.7 * nightFactor * Math.random();
+                });
+            }
+        }
+        generateStars();
+
         const modal = document.getElementById("info-modal");
         const openBtn = document.getElementById("info-btn");
         const closeBtn = document.getElementById("close-modal-btn");
@@ -371,7 +501,8 @@
             modal.classList.remove("visible-modal");
             modal.classList.add("hidden-modal");
         });
-        generateStars();
+
+        
         lucide.createIcons();
         d3.json("modis_arctic_2023.json")
           .then(data => {
@@ -457,7 +588,7 @@
         let lastTime = Date.now();
         function animateClouds() {
             const now = Date.now();
-            const delta = (now - lastTime) / 16.67; // ~normalize to 60fps
+            const delta = (now - lastTime) / 16.67;
             lastTime = now;
             cloudsArray.forEach(cloud => {
                 let left = parseFloat(cloud.style.left);
