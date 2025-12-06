@@ -3,35 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scrolling Through the Arctic</title>
+    <title>Polar Bears: Arctic Life</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
         body { margin: 0; overflow-x: hidden; font-family: 'Segoe UI', sans-serif; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         #app-container { transition: background-color 0.5s linear; }
+
         @keyframes twinkle {
             0%, 100% { opacity: 0.8; transform: scale(1); }
             50% { opacity: 0.3; transform: scale(0.8); }
         }
         .star { animation: twinkle 3s infinite ease-in-out; }
-        .tooltip {
-    transition: opacity 0.5s ease, transform 0.5s ease;
-    pointer-events: none;
-}
-.tooltip.hidden {
-    opacity: 0;
-    transform: translateY(20px);
-}
-.tooltip.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
+
+        .tooltip { transition: opacity 0.5s ease, transform 0.5s ease; pointer-events: none; }
+        .tooltip.hidden { opacity: 0; transform: translateY(20px); }
+        .tooltip.visible { opacity: 1; transform: translateY(0); }
+
         .modal { transition: opacity 0.3s ease, pointer-events 0.3s ease; }
         .modal.hidden-modal { opacity: 0; pointer-events: none; }
         .modal.visible-modal { opacity: 1; pointer-events: auto; }
+
         .loader {
             border: 4px solid rgba(255, 255, 255, 0.1);
             border-left-color: #ffffff;
@@ -41,94 +38,487 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .section { min-height: 100vh; }
+        .fade-in { opacity: 0; transform: translateY(30px); transition: opacity 0.8s ease, transform 0.8s ease; }
+        .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+        .fact-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .fact-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .quiz-card {
+            background: rgba(59, 130, 246, 0.15);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(147, 197, 253, 0.3);
+            transition: all 0.3s ease;
+        }
+        .quiz-card:hover {
+            border-color: rgba(147, 197, 253, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .quiz-option {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .quiz-option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .quiz-option.correct {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: #22c55e;
+        }
+        .quiz-option.incorrect {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: #ef4444;
+        }
+        .quiz-option.selected {
+            border-color: rgba(147, 197, 253, 0.8);
+            background: rgba(147, 197, 253, 0.2);
+        }
+
+        .guess-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(147, 197, 253, 0.3);
+            transition: all 0.3s ease;
+        }
+        .guess-input:focus {
+            border-color: rgba(147, 197, 253, 0.8);
+            background: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+
+        .reveal-btn {
+            transition: all 0.3s ease;
+        }
+        .reveal-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .hidden-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+        .hidden-content.revealed {
+            max-height: 500px;
+            opacity: 1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(5deg); }
+        }
+        @keyframes slideIn {
+            from { transform: translateX(-100px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes snowfall {
+            0% {
+                transform: translateY(-100px) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(calc(100vh + 100px)) translateX(var(--drift));
+                opacity: 0;
+            }
+        }
+
+        .snowflake {
+            position: absolute;
+            top: -50px;
+            color: white;
+            font-size: 1em;
+            animation: snowfall linear infinite;
+            pointer-events: none;
+            user-select: none;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+
+        #icebergs-container {
+            transition: opacity 0.1s ease, transform 0.1s ease;
+        }
+
+        .iceberg {
+            position: absolute;
+            bottom: 0;
+            opacity: 0.9;
+            filter: blur(0.5px);
+        }
+
+        .iceberg-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .iceberg-above {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 248, 255, 0.95) 50%, rgba(220, 235, 255, 0.9) 100%);
+            clip-path: polygon(0% 60%, 5% 40%, 15% 25%, 30% 15%, 50% 10%, 70% 15%, 85% 25%, 95% 40%, 100% 60%, 100% 100%, 0% 100%);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 40%;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.2), inset 0 5px 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .iceberg-below {
+            background: linear-gradient(180deg, rgba(100, 150, 200, 0.6) 0%, rgba(60, 100, 150, 0.5) 50%, rgba(40, 70, 120, 0.4) 100%);
+            clip-path: polygon(0% 0%, 5% 5%, 15% 10%, 30% 15%, 50% 18%, 70% 15%, 85% 10%, 95% 5%, 100% 0%, 98% 20%, 90% 40%, 75% 60%, 50% 70%, 25% 60%, 10% 40%, 2% 20%);
+            position: absolute;
+            top: 40%;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            box-shadow: inset 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .water-line {
+            position: absolute;
+            top: 40%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.5) 50%, transparent 100%);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        @keyframes icebergFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .iceberg-1 { animation: icebergFloat 8s ease-in-out infinite; }
+        .iceberg-2 { animation: icebergFloat 10s ease-in-out infinite 1s; }
+        .iceberg-3 { animation: icebergFloat 12s ease-in-out infinite 2s; }
+        .iceberg-4 { animation: icebergFloat 9s ease-in-out infinite 0.5s; }
+
+        .section-divider {
+            height: 0;
+            display: none;
+        }
+
+        .transition-wave {
+            display: none;
+        }
+
+        .narrative-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4rem 2rem;
+            position: relative;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+        }
+        .narrative-content {
+            max-width: 800px;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        .narrative-content.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .season-facts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+        .season-fact-card {
+            padding: 2rem;
+            background: rgba(59, 130, 246, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            border: 2px solid rgba(147, 197, 253, 0.3);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease 0.2s, transform 0.6s ease 0.2s;
+        }
+        .season-fact-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #day-checkpoint-panel {
+            opacity: 0;
+            transform: scale(0.92);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        #day-checkpoint-panel.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
     </style>
 </head>
+
 <body class="bg-gray-900 text-white">
+
+    <section id="intro-section" class="section relative flex items-center justify-center bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900 overflow-hidden">
+        <!-- Background decorative elements -->
+        <div class="absolute inset-0 opacity-20">
+            <div class="absolute top-20 left-10 w-32 h-32 bg-white rounded-full blur-3xl"></div>
+            <div class="absolute bottom-20 right-10 w-40 h-40 bg-blue-300 rounded-full blur-3xl"></div>
+        </div>
+
+
+        <!-- Snow effect -->
+        <div id="snow-container" class="absolute inset-0 overflow-hidden pointer-events-none z-10"></div>
+
+        <!-- Icebergs at the bottom with underwater portions - full width -->
+        <div id="icebergs-container" class="absolute bottom-0 left-0 right-0 h-80 pointer-events-none z-5">
+            <!-- Iceberg 1 -->
+            <div class="iceberg iceberg-1" style="left: 0%; width: 350px; height: 240px;">
+                <div class="iceberg-container w-full h-full">
+                    <div class="iceberg-above"></div>
+                    <div class="iceberg-below"></div>
+                    <div class="water-line"></div>
+                </div>
+            </div>
+            
+            <!-- Iceberg 2 -->
+            <div class="iceberg iceberg-2" style="left: 25%; width: 400px; height: 260px;">
+                <div class="iceberg-container w-full h-full">
+                    <div class="iceberg-above"></div>
+                    <div class="iceberg-below"></div>
+                    <div class="water-line"></div>
+                </div>
+            </div>
+            
+            <!-- Iceberg 3 -->
+            <div class="iceberg iceberg-3" style="left: 55%; width: 380px; height: 250px;">
+                <div class="iceberg-container w-full h-full">
+                    <div class="iceberg-above"></div>
+                    <div class="iceberg-below"></div>
+                    <div class="water-line"></div>
+                </div>
+            </div>
+            
+            <!-- Iceberg 4 -->
+            <div class="iceberg iceberg-4" style="left: 80%; width: 320px; height: 220px;">
+                <div class="iceberg-container w-full h-full">
+                    <div class="iceberg-above"></div>
+                    <div class="iceberg-below"></div>
+                    <div class="water-line"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="relative z-20 text-center px-6 max-w-4xl mx-auto fade-in">
+            <h1 class="text-5xl md:text-7xl font-black tracking-tighter mb-6 drop-shadow-2xl">
+                <span class="text-white">POLAR BEARS</span><br/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-white to-blue-200">ARCTIC LIFE</span>
+            </h1>
+            <p class="text-xl md:text-2xl text-blue-100 mb-8 leading-relaxed drop-shadow-lg text-center mx-auto max-w-3xl">
+                Journey through the Arctic and discover how polar bears survive in one of Earth's most extreme environments. Experience their world through changing seasons and conditions.
+            </p>
+            <p class="text-lg text-blue-200/80 mb-12 drop-shadow-md text-center mx-auto max-w-2xl">
+                Scroll down to explore their habitat and learn fascinating facts.
+            </p>
+
+            <div class="flex justify-center animate-bounce">
+                <i data-lucide="arrow-down" class="w-8 h-8 text-white/60"></i>
+            </div>
+        </div>
+    </section>
+
+    <!-- Hook section before visualization with scrolly map -->
+    <section id="hook-section" class="relative" style="height: 600vh;">
+        <div class="sticky top-0 w-full h-screen overflow-hidden bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900">
+            <!-- Map container -->
+            <div id="map-container" class="absolute inset-0 flex items-center justify-center">
+                <svg id="arctic-map" class="w-full h-full" viewBox="0 0 3600 1800" preserveAspectRatio="xMidYMid meet">
+                    <!-- Background ocean -->
+                    <rect width="3600" height="1800" fill="#0f172a"/>
+                    
+                    <!-- World map (will be populated by D3) -->
+                    <g id="world-map"></g>
+                    
+                    <!-- Location marker for Utqiagvik (will be positioned by D3) -->
+                    <g id="location-marker"></g>
+                    
+                    <!-- Labels -->
+                    <g id="map-labels">
+                        <text id="alaska-label" fill="#ffffff" font-size="48" font-weight="bold" text-anchor="middle" opacity="0">ALASKA</text>
+                        <text id="city-label" fill="#ffffff" font-size="32" font-weight="bold" text-anchor="middle" opacity="0">Utqiagvik</text>
+                    </g>
+                </svg>
+            </div>
+            
+            <!-- Text overlay -->
+            <div id="map-text-overlay" class="absolute inset-0 flex items-start justify-center pt-20 md:pt-32 z-20 pointer-events-none" style="opacity: 1;">
+                <div class="text-center px-6 max-w-4xl">
+                    <h2 id="map-title" class="text-4xl md:text-6xl font-black tracking-tighter mb-6 drop-shadow-2xl text-white">
+                        WHERE IN THE ARCTIC?
+                    </h2>
+                    <p id="map-description" class="text-xl md:text-2xl text-blue-100 mb-8 leading-relaxed drop-shadow-lg max-w-3xl mx-auto">
+                        We're exploring Utqiagvik, Alaska—the northernmost city in the United States, located above the Arctic Circle.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Blur overlay that appears later -->
+            <div id="map-blur-overlay" class="absolute inset-0 z-25 pointer-events-none opacity-0 transition-opacity duration-1000" style="backdrop-filter: blur(10px); background: rgba(0, 0, 0, 0.5);">
+                <div class="absolute inset-0 flex items-start justify-center pt-20 md:pt-32">
+                    <div class="text-center px-6 max-w-4xl">
+                        <p id="map-reason" class="text-2xl md:text-3xl text-white mb-12 drop-shadow-2xl max-w-3xl mx-auto font-bold leading-relaxed">
+                            This location experiences extreme seasonal variations in daylight, making it perfect for understanding how polar bears adapt to changing conditions throughout the day and year.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <div id="loading-screen" class="fixed inset-0 z-[60] bg-gray-900 flex flex-col items-center justify-center transition-opacity duration-500">
         <div class="loader mb-4"></div>
-        <p class="text-blue-200 text-sm tracking-widest uppercase">Loading Satellite Data...</p>
+        <p class="text-blue-200 text-sm tracking-widest uppercase">Loading Arctic Data...</p>
         <p id="loading-subtext" class="text-blue-200/50 text-xs mt-2">Connecting to modis_arctic_2023.json...</p>
     </div>
-    <div id="app-container" class="fixed inset-0 w-full h-full overflow-hidden opacity-0 transition-opacity duration-1000">
-        <div id="stars-layer" class="absolute inset-0 transition-opacity duration-1000" style="opacity: 0;">
-        </div>
-        <div id="clouds-layer" class="absolute inset-0 pointer-events-none mix-blend-overlay transition-opacity duration-1000" 
-             style="background: repeating-linear-gradient(45deg, transparent, transparent 100px, rgba(255,255,255,0.1) 100px, rgba(255,255,255,0.1) 200px);">
-        </div>
-        <div id="cloud-visual-container"></div>
-        <div class="absolute inset-0 flex items-end justify-center pb-20 pointer-events-none">
-            <div id="celestial-body" class="relative w-[150vw] h-[150vw] rounded-full border border-white/5 transition-transform duration-75 linear origin-center">
-                <div class="absolute top-1/2 -right-12 w-24 h-24 bg-yellow-300 rounded-full blur-xl shadow-[0_0_100px_rgba(253,224,71,0.6)]"></div>
-                <div class="absolute top-1/2 -right-12 w-24 h-24 bg-yellow-100 rounded-full shadow-2xl"></div>
-                <div class="absolute top-1/2 -left-12 w-20 h-20 bg-gray-200 rounded-full shadow-[0_0_50px_rgba(255,255,255,0.2)] opacity-80">
-                    <div class="w-4 h-4 bg-gray-300 rounded-full absolute top-4 left-4 opacity-50"></div>
-                    <div class="w-6 h-6 bg-gray-300 rounded-full absolute bottom-6 right-6 opacity-50"></div>
+
+    <section id="visualization-section" class="relative" style="height: 400vh;">
+
+        <div id="app-container" class="sticky top-0 w-full h-screen overflow-hidden opacity-0 transition-opacity duration-1000 z-10">
+            <div id="stars-layer" class="absolute inset-0 transition-opacity duration-1000"></div>
+            <div id="clouds-layer" class="absolute inset-0 pointer-events-none mix-blend-overlay transition-opacity duration-1000"
+                 style="background: repeating-linear-gradient(45deg, transparent, transparent 100px, rgba(255,255,255,0.1) 100px, rgba(255,255,255,0.1) 200px);">
+            </div>
+
+            <div id="cloud-visual-container"></div>
+
+            <div class="absolute inset-0 flex items-end justify-center pb-20 pointer-events-none">
+                <div id="celestial-body" class="relative w-[150vw] h-[150vw] rounded-full border border-white/5 transition-transform duration-75 linear origin-center">
+                    <div class="absolute top-1/2 -right-12 w-24 h-24 bg-yellow-300 rounded-full blur-xl shadow-[0_0_100px_rgba(253,224,71,0.6)]"></div>
+                    <div class="absolute top-1/2 -right-12 w-24 h-24 bg-yellow-100 rounded-full shadow-2xl"></div>
+                    <div class="absolute top-1/2 -left-12 w-20 h-20 bg-gray-200 rounded-full shadow-[0_0_50px_rgba(255,255,255,0.2)] opacity-80">
+                        <div class="w-4 h-4 bg-gray-300 rounded-full absolute top-4 left-4 opacity-50"></div>
+                        <div class="w-6 h-6 bg-gray-300 rounded-full absolute bottom-6 right-6 opacity-50"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="absolute inset-0 flex flex-col justify-between p-6 md:p-12 z-50 pointer-events-none">
+                <div class="flex justify-between items-start pointer-events-auto">
+
+                    <div>
+                        <h1 class="text-4xl md:text-6xl font-black tracking-tighter drop-shadow-lg">
+                            POLAR BEAR<br/>
+                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-white">
+                                HABITAT
+                            </span>
+                        </h1>
+                        <p class="text-blue-100 mt-2 max-w-md drop-shadow-md text-sm md:text-base">
+                            Experience a polar bear's 24-hour cycle in the Arctic. Scroll to advance through the day and see how conditions change.
+                        </p>
+
+                        <button id="info-btn" class="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-sm border border-white/10 transition-all flex items-center gap-2">
+                            <i data-lucide="info" class="w-4 h-4"></i> Project Info & Writeup
+                        </button>
+                    </div>
+
+                    <div class="hidden md:block text-right">
+                        <p class="text-white/60 text-sm uppercase tracking-widest">Current Time</p>
+                        <p id="time-display" class="text-6xl font-mono font-bold tabular-nums drop-shadow-lg">00:00</p>
+                    </div>
+                </div>
+
+                <div id="tooltip-container" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full pointer-events-none"></div>
+
+                <div class="pointer-events-auto space-y-6 w-full">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center shadow-lg">
+                            <div id="vis-brightness" class="w-16 h-16 mr-4 flex items-center justify-center"></div>
+                            <div>
+                                <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Brightness Index</p>
+                                <p id="val-brightness" class="text-2xl font-bold">0</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center shadow-lg">
+                            <div id="vis-cloud" class="w-16 h-16 mr-4 flex items-center justify-center"></div>
+                            <div>
+                                <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Cloud Cover</p>
+                                <p id="val-cloud" class="text-2xl font-bold">0%</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center space-x-4 shadow-lg">
+                            <i data-lucide="clock" class="text-blue-300 w-6 h-6"></i>
+                            <div>
+                                <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Daylight Hours</p>
+                                <p id="val-daylight" class="text-2xl font-bold">0h</p>
+                                <p class="text-[10px] text-blue-300/60 uppercase">Seasonal Avg</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex flex-col justify-center space-y-2 shadow-lg">
+                            <span class="text-blue-200 text-xs font-medium uppercase tracking-wider">Season</span>
+                            <div class="flex space-x-1 bg-black/20 p-1 rounded-lg" id="season-controls"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div id="location-display" class="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center transition-all duration-300">
+                            <p class="text-blue-200 text-xs font-medium uppercase tracking-wider mb-1">Current Location</p>
+                            <p id="current-location-text" class="text-white text-lg font-bold transition-opacity duration-300">Utqiagvik, Alaska</p>
+                            <p id="location-description" class="text-blue-300/70 text-xs mt-1 transition-opacity duration-300">Polar Bear Territory</p>
+                        </div>
+
+                        <div id="year-progress" class="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center transition-all duration-300">
+                            <p class="text-blue-200 text-xs font-medium uppercase tracking-wider mb-1">Time of Day</p>
+                            <p id="year-season" class="text-white text-lg font-bold">00:00</p>
+                            <div class="mt-2 w-full bg-white/10 rounded-full h-2">
+                                <div id="year-progress-bar" class="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="scroll-hint" class="text-center w-full pb-4">
+                        <p class="text-white text-xs uppercase tracking-widest animate-bounce">Scroll to Advance Through 24 Hours</p>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="absolute inset-0 flex flex-col justify-between p-6 md:p-12 z-50 pointer-events-none">
-            <div class="flex justify-between items-start pointer-events-auto">
-                <div>
-                    <h1 class="text-4xl md:text-6xl font-black tracking-tighter drop-shadow-lg">
-                        SCROLLING<br/>
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-white">
-                            THROUGH THE ARCTIC
-                        </span>
-                    </h1>
-                    <p class="text-blue-100 mt-2 max-w-md drop-shadow-md text-sm md:text-base">
-                        A 24-hour visual journey exploring daylight, brightness, and cloud patterns.
-                    </p>
-                    <button id="info-btn" class="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-full text-xs font-bold uppercase tracking-widest backdrop-blur-sm border border-white/10 transition-all flex items-center gap-2">
-                        <i data-lucide="info" class="w-4 h-4"></i> Project Info & Writeup
-                    </button>
-                </div>
-                <div class="hidden md:block text-right">
-                    <p class="text-white/60 text-sm uppercase tracking-widest">Current Time</p>
-                    <p id="time-display" class="text-6xl font-mono font-bold tabular-nums drop-shadow-lg">00:00</p>
-                </div>
+
+    </section>
+
+    <section id="facts-section" class="section bg-gradient-to-b from-gray-900 via-blue-900 to-gray-900 py-20 px-6 min-h-screen relative overflow-hidden">
+
+        <div class="max-w-6xl mx-auto relative z-10">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl md:text-6xl font-black tracking-tighter mb-4 drop-shadow-lg">
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-white">SEASONAL</span><br/>
+                    <span class="text-white">FACTS & BEHAVIORS</span>
+                </h2>
+                <p class="text-xl text-blue-200/80 max-w-2xl mx-auto">
+                    Discover how polar bears adapt to changing daylight throughout the seasons
+                </p>
             </div>
-            <div id="tooltip-container" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-full pointer-events-none">
-            </div>
-            <div class="pointer-events-auto space-y-6 w-full">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center shadow-lg">
-                        <div id="vis-brightness" class="w-16 h-16 mr-4 flex items-center justify-center"></div>
-                        <div>
-                            <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Brightness Index</p>
-                            <p id="val-brightness" class="text-2xl font-bold">0</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center shadow-lg">
-                        <div id="vis-cloud" class="w-16 h-16 mr-4 flex items-center justify-center"></div>
-                        <div>
-                            <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Cloud Cover</p>
-                            <p id="val-cloud" class="text-2xl font-bold">0%</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex items-center space-x-4 shadow-lg">
-                        <i data-lucide="clock" class="text-blue-300 w-6 h-6"></i>
-                        <div>
-                            <p class="text-blue-200 text-xs font-medium uppercase tracking-wider">Daylight Hours</p>
-                            <p id="val-daylight" class="text-2xl font-bold">0h</p>
-                            <p class="text-[10px] text-blue-300/60 uppercase">Seasonal Avg</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl flex flex-col justify-center space-y-2 shadow-lg">
-                        <span class="text-blue-200 text-xs font-medium uppercase tracking-wider">Season</span>
-                        <div class="flex space-x-1 bg-black/20 p-1 rounded-lg" id="season-controls">
-                        </div>
-                    </div>
-                </div>
-                <div class="bg-black/40 backdrop-blur-md rounded-2xl p-4 border border-white/10 overflow-x-auto no-scrollbar">
-                    <div class="flex space-x-6 min-w-max" id="location-controls">
-                    </div>
-                </div>
-                <div id="scroll-hint" class="text-center w-full pb-4">
-                    <p class="text-white text-xs uppercase tracking-widest animate-bounce">Scroll Down to Advance Time</p>
-                </div>
-            </div>
+
+            <div id="quiz-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-16"></div>
+
+            <div id="seasonal-facts-container"></div>
         </div>
-    </div>
+    </section>
+
     <div id="info-modal" class="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center modal hidden-modal p-4">
         <div class="bg-gray-800 border border-gray-700 w-full max-w-2xl rounded-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex justify-between items-center mb-6">
@@ -137,7 +527,7 @@
                     <i data-lucide="x" class="text-white"></i>
                 </button>
             </div>
-            
+
             <div class="space-y-6 text-gray-300 leading-relaxed">
                 <div class="border-b border-gray-700 pb-4">
                     <h3 class="text-sm uppercase tracking-wider text-blue-400 font-bold mb-2">Team Members</h3>
@@ -148,490 +538,1119 @@
                         <li>Faline Le</li>
                     </ul>
                 </div>
+
                 <div>
                     <h3 class="text-sm uppercase tracking-wider text-blue-400 font-bold mb-2">1. What have you done so far?</h3>
                     <p>
                         We have successfully implemented the core "scrollytelling" architecture of our project using HTML, CSS, and D3.js. 
-                        Currently, the application simulates a 24-hour cycle in the Arctic, allowing users to scroll to progress time 
-                        and observe changes in sky color, sunlight, and environmental conditions. We have integrated our real NASA MODIS dataset (2023),
-                        allowing users to toggle between different Arctic sites and seasons to see real averages for Cloud Cover and Surface Brightness.
+                        Users scroll through a 24-hour cycle in the Arctic and observe changes in sky color, sunlight, and environmental conditions.
                     </p>
                 </div>
+
                 <div>
-                    <h3 class="text-sm uppercase tracking-wider text-blue-400 font-bold mb-2">2. What will be the most challenging part of your project to design and why?</h3>
+                    <h3 class="text-sm uppercase tracking-wider text-blue-400 font-bold mb-2">2. What will be the most challenging part?</h3>
                     <p>
-                        The most challenging aspect will be refining the visual transitions. While we now have the real data points, mapping the 
-                        continuous "24-hour scroll" to these static seasonal averages requires careful design. Specifically, visualizing the "Midnight Sun" 
-                        (where the sun never sets) versus "Polar Night" (where it never rises) purely through code-driven animation is difficult. 
-                        We need to ensure the sun's trajectory on screen accurately reflects the `daylightHours` data point we just imported.
+                        The most challenging aspect will be refining visual transitions so the "Midnight Sun" and "Polar Night" feel realistic 
+                        while syncing with real NASA MODIS 2023 datasets used for brightness, cloud cover, and daylight hours.
                     </p>
                 </div>
             </div>
         </div>
     </div>
-    <div style="height: 800vh;"></div>
 
     <script>
         let ARCTIC_DATA = [];
         let LOCATIONS = [];
-        const SEASONS = ["Winter", "Spring", "Summer", "Fall"];
+        const SEASONS = ["Spring", "Summer", "Fall", "Winter"];
+
         let state = {
             scrollProgress: 0,
             season: "Spring",
-            location: "Longyearbyen, Svalbard",
-            currentTime: 0
+            location: "Utqiagvik, Alaska",
+            currentTime: 0,
+            currentSection: 'intro',
         };
-        const setupGauge = (elementId, color) => {
-            const width = 64, height = 64;
-            const svg = d3.select(elementId).html("").append("svg")
-                .attr("width", width)
-                .attr("height", height)
-                .append("g")
-                .attr("transform", `translate(${width/2},${height/2})`);
-            const arcBg = d3.arc().innerRadius(20).outerRadius(28).startAngle(0).endAngle(2 * Math.PI);
-            svg.append("path").attr("d", arcBg).attr("fill", "rgba(255,255,255,0.1)");
+
+        const QUIZ_QUESTIONS = [
+            {
+                question: "Do polar bears hibernate?",
+                options: ["Yes, all winter", "No, they never hibernate", "Only pregnant females", "Only in extreme cold"],
+                correct: 1,
+                explanation: "Polar bears never hibernate! They remain active all winter, hunting seals at breathing holes in the ice."
+            },
+            {
+                question: "What season is mating season for polar bears?",
+                options: ["Winter", "Spring", "Summer", "Fall"],
+                correct: 1,
+                explanation: "Spring is mating season for polar bears. Females give birth to cubs in winter dens."
+            },
+            {
+                question: "How far can a polar bear smell a seal?",
+                options: ["100 feet", "500 feet", "Over 1 mile", "5 miles"],
+                correct: 2,
+                explanation: "Polar bears can smell a seal from over a mile away, even through several feet of ice and snow!"
+            },
+            {
+                question: "What is polar bear fur actually?",
+                options: ["White hair", "Transparent and hollow", "Brown with white tips", "Gray fur"],
+                correct: 1,
+                explanation: "Polar bear fur is actually transparent and hollow! It reflects visible light, making them appear white."
+            },
+            {
+                question: "How long can polar bears swim without rest?",
+                options: ["1 hour", "1 day", "Several days", "1 week"],
+                correct: 2,
+                explanation: "Polar bears can swim for days at a time, covering distances of up to 60 miles (100 km) without rest!"
+            }
+        ];
+
+        const GUESSING_GAMES = [
+            {
+                title: "Guess the Weight!",
+                question: "How much can an adult male polar bear weigh?",
+                answer: 1500,
+                unit: "pounds",
+                hint: "They're the largest land carnivores on Earth!",
+                icon: "scale"
+            },
+            {
+                title: "Guess the Distance!",
+                question: "How far can a polar bear swim in one journey?",
+                answer: 60,
+                unit: "miles",
+                hint: "They're excellent swimmers!",
+                icon: "waves"
+            },
+            {
+                title: "Guess the Thickness!",
+                question: "How thick is a polar bear's blubber layer?",
+                answer: 4.5,
+                unit: "inches",
+                hint: "It helps them stay warm in freezing temperatures!",
+                icon: "thermometer"
+            }
+        ];
+
+        const SEASONAL_FACTS = {
+            Winter: {
+                daylightHours: "0-4 hours",
+                description: "With minimal daylight, polar bears rely on their incredible adaptations to survive the darkest season.",
+                facts: [
+                    { title: "They Don't Hibernate!", content: "Unlike other bears, polar bears never hibernate. They remain active all winter, hunting seals at breathing holes in the ice even with almost no daylight.", icon: "moon", isReveal: true, daylightConnection: "Active during 0-4 hours of daylight" },
+                    { title: "Incredible Night Vision", content: "Polar bears have excellent night vision, allowing them to hunt in the dark polar winter when there's little to no daylight. Their eyes are adapted to see in near-total darkness.", icon: "eye", daylightConnection: "Essential for hunting in minimal daylight" },
+                    { title: "Superior Sense of Smell", content: "Polar bears can smell a seal from over a mile away, even through several feet of ice and snow. This sense becomes crucial when visibility is limited by darkness.", icon: "wind", daylightConnection: "Compensates for lack of daylight" },
+                    { title: "Thick Blubber", content: "Polar bears have blubber up to 4.5 inches (11 cm) thick, which helps them stay warm in freezing Arctic temperatures during the long, dark winter months.", icon: "thermometer", daylightConnection: "Protection during extended darkness" }
+                ]
+            },
+            Spring: {
+                daylightHours: "11-21 hours",
+                description: "As daylight returns, polar bears emerge from dens and begin their most active hunting season.",
+                facts: [
+                    { title: "Mating Season", content: "Spring is mating season for polar bears. With increasing daylight (11-21 hours), bears become more active and social. Females give birth to cubs in winter dens, usually to twins.", icon: "heart", daylightConnection: "Increased activity with more daylight" },
+                    { title: "Whale Hunting", content: "In spring, polar bears sometimes hunt whales that get trapped in ice cracks, providing a valuable food source. The longer daylight hours give them more time to hunt.", icon: "waves", daylightConnection: "More hunting time with extended daylight" },
+                    { title: "Return to Shorelines", content: "As ice begins to break and daylight increases, polar bears return closer to shorelines, following the retreating ice edge where seals are more accessible.", icon: "flower", daylightConnection: "Following ice edge as daylight grows" }
+                ]
+            },
+            Summer: {
+                daylightHours: "24 hours",
+                description: "With 24 hours of continuous daylight, polar bears enter their fasting period and adapt to the midnight sun.",
+                facts: [
+                    { title: "Fasting Period", content: "During summer, when sea ice melts and there's 24 hours of daylight, polar bears enter a fasting period. They can go months without eating, surviving on stored fat.", icon: "sun", daylightConnection: "Fasting during continuous daylight" },
+                    { title: "Hair is Not White", content: "Polar bear fur is actually transparent and hollow. It reflects visible light, making them appear white, and helps trap heat from the sun—crucial during 24-hour daylight.", icon: "sun", daylightConnection: "Reflects sunlight during endless day" },
+                    { title: "Swimming Champions", content: "Polar bears are excellent swimmers and can swim for days at a time, covering distances of up to 60 miles (100 km) without rest. With 24-hour daylight, they can swim at any time.", icon: "waves", daylightConnection: "Active swimming during continuous daylight" }
+                ]
+            },
+            Fall: {
+                daylightHours: "8-12 hours",
+                description: "As daylight decreases, polar bears prepare for winter by building dens and teaching young cubs essential skills.",
+                facts: [
+                    { title: "Play Fighting", content: "Young polar bears play fight to learn essential hunting and survival skills they'll need as adults. With decreasing daylight, they practice before the dark winter.", icon: "zap", daylightConnection: "Learning before daylight fades" },
+                    { title: "Den Building", content: "Pregnant females build snow dens in the fall where they give birth and care for cubs during the harsh winter months. They prepare as daylight hours shrink.", icon: "home", daylightConnection: "Preparing for minimal daylight ahead" },
+                    { title: "Ice Reformation", content: "As daylight decreases in fall, sea ice begins to reform. Polar bears travel north, following the ice as it forms, preparing for winter hunting.", icon: "snowflake", daylightConnection: "Following ice as daylight wanes" }
+                ]
+            }
+        };
+
+        const setupGauge = (id, color) => {
+            const w = 64, h = 64;
+            const svg = d3.select(id).html("").append("svg")
+                .attr("width", w).attr("height", h)
+                .append("g").attr("transform", `translate(${w/2},${h/2})`);
+            svg.append("path").attr("d", d3.arc().innerRadius(20).outerRadius(28).startAngle(0).endAngle(2*Math.PI))
+                .attr("fill", "rgba(255,255,255,0.1)");
             const arcFg = d3.arc().innerRadius(20).outerRadius(28).cornerRadius(5);
-            const path = svg.append("path").datum({endAngle: 0}).attr("fill", color).attr("d", arcFg);
+            const path = svg.append("path").datum({endAngle:0}).attr("fill", color).attr("d", arcFg);
             return { path, arcFg };
         };
-        const brightGauge = setupGauge("#vis-brightness", "#fbbf24");
-        const cloudGauge = setupGauge("#vis-cloud", "#60a5fa");
-        const updateGauge = (gaugeObj, value, max) => {
-            const angle = (value / max) * 2 * Math.PI;
-            gaugeObj.path.transition().duration(500).attrTween("d", function(d) {
-                const interpolate = d3.interpolate(d.endAngle, angle);
-                return function(t) {
-                    d.endAngle = interpolate(t);
-                    return gaugeObj.arcFg(d);
-                };
+
+        const brightGauge = setupGauge("#vis-brightness","#fbbf24");
+        const cloudGauge = setupGauge("#vis-cloud","#60a5fa");
+
+        const updateGauge = (g,v,m) => {
+            const a = (v/m)*2*Math.PI;
+            g.path.transition().duration(500).attrTween("d",function(d){
+                const i = d3.interpolate(d.endAngle,a);
+                return t => { d.endAngle=i(t); return g.arcFg(d); };
             });
         };
+
         function initializeUI() {
-            const seasonContainer = document.getElementById("season-controls");
-            const locContainer = document.getElementById("location-controls");
-            seasonContainer.innerHTML = '';
-            locContainer.innerHTML = '';
-            SEASONS.forEach((s) => {
-                const btn = document.createElement("button");
-                btn.className = `flex-1 py-1 px-2 text-xs rounded-md transition-colors ${s === state.season ? 'bg-white text-black font-bold' : 'text-white/60 hover:bg-white/10'}`;
-                btn.textContent = s;
-                btn.onclick = () => {
-                    state.season = s;
-                    updateSeasonButtons();
-                    render();
-                };
-                seasonContainer.appendChild(btn);
+            const c = document.getElementById("season-controls");
+            c.innerHTML = '';
+            SEASONS.forEach(s=>{
+                const b = document.createElement("button");
+                b.className = `flex-1 py-1 px-2 text-xs rounded-md transition-colors ${
+                    s===state.season?'bg-white text-black font-bold':'text-white/60 hover:bg-white/10'
+                }`;
+                b.textContent=s;
+                b.onclick=()=>{ state.season=s; updateSeasonButtons(); render(); };
+                c.appendChild(b);
             });
-            LOCATIONS.forEach((loc) => {
-                const btn = document.createElement("button");
-                btn.className = `group flex items-center space-x-2 transition-all duration-300 min-w-max`;
-                btn.innerHTML = `
-                    <div class="p-2 rounded-full transition-colors ${loc === state.location ? 'bg-yellow-400 text-black' : 'bg-white/10 text-white'}">
-                        <i data-lucide="map-pin" class="w-4 h-4"></i>
-                    </div>
-                    <span class="text-sm font-medium ${loc === state.location ? 'text-white' : 'text-gray-300'}">${loc}</span>
-                `;
-                btn.onclick = () => {
-                    state.location = loc;
-                    updateLocationButtons();
-                    render();
-                };
-                locContainer.appendChild(btn);
-            });
-            document.getElementById("loading-screen").style.opacity = 0;
-            setTimeout(() => {
-                document.getElementById("loading-screen").style.display = 'none';
-                document.getElementById("app-container").style.opacity = 1;
-            }, 500);
+
+            updateLocationDisplay();
+            updateYearProgress();
+            updateYearProgressBar(0);
+            initializeQuizzes();
+            initializeSeasonalFacts();
+
+            document.getElementById("loading-screen").style.opacity=0;
+            setTimeout(()=>{ document.getElementById("loading-screen").style.display='none'; },500);
+
             lucide.createIcons();
             render();
         }
+
         function updateSeasonButtons() {
-            const sBtns = document.getElementById("season-controls").querySelectorAll("button");
-            sBtns.forEach((btn, i) => {
+            const btns=document.getElementById("season-controls").querySelectorAll("button");
+            btns.forEach((b,i)=>{
                 const s = SEASONS[i];
-                btn.className = `flex-1 py-1 px-2 text-xs rounded-md transition-colors ${s === state.season ? 'bg-white text-black font-bold' : 'text-white/60 hover:bg-white/10'}`;
+                b.className = `flex-1 py-1 px-2 text-xs rounded-md transition-colors ${
+                    s===state.season?'bg-white text-black font-bold':'text-white/60 hover:bg-white/10'
+                }`;
             });
         }
-        function updateLocationButtons() {
-            const buttons = document.getElementById("location-controls").querySelectorAll("button");
-            buttons.forEach((btn, i) => {
-                const loc = LOCATIONS[i];
-                const iconContainer = btn.querySelector("div");
-                const text = btn.querySelector("span");
-                if(loc === state.location) {
-                    iconContainer.className = "p-2 rounded-full transition-colors bg-yellow-400 text-black";
-                    text.className = "text-sm font-medium text-white";
-                } else {
-                    iconContainer.className = "p-2 rounded-full transition-colors bg-white/10 text-white";
-                    text.className = "text-sm font-medium text-gray-300";
-                }
+
+        function updateLocationDisplay() {
+            const t=document.getElementById("current-location-text");
+            const d=document.getElementById("location-description");
+            t.style.opacity=0; d.style.opacity=0;
+            setTimeout(()=>{
+                t.textContent=state.location;
+                d.textContent="Polar Bear Territory";
+                t.style.opacity=1; d.style.opacity=1;
+            },200);
+        }
+
+        function initializeQuizzes(){
+            const c=document.getElementById("quiz-container");
+            if(!c) return;
+            c.innerHTML='';
+
+            // Add quiz questions
+            QUIZ_QUESTIONS.forEach((q,i)=>{
+                const card=document.createElement("div");
+                card.className="quiz-card rounded-xl p-6 fade-in relative overflow-hidden";
+                card.style.transitionDelay=`${i*0.1}s`;
+                const quizId=`quiz-${i}`;
+                card.innerHTML=`
+                    <div class="flex items-start space-x-4 mb-4 relative z-10">
+                        <div class="p-3 bg-blue-500/20 rounded-lg">
+                            <i data-lucide="help-circle" class="w-6 h-6 text-blue-300"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-white mb-4">${q.question}</h3>
+                        </div>
+                    </div>
+                    <div class="space-y-2 mb-4 relative z-10" id="${quizId}-options">
+                        ${q.options.map((opt,j)=>`
+                            <button class="quiz-option w-full text-left p-3 rounded-lg border border-white/20 bg-white/5 text-blue-100" 
+                                    data-quiz="${i}" data-option="${j}">
+                                ${opt}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="${quizId}-result" class="hidden mt-4 p-3 rounded-lg relative z-10"></div>
+                `;
+                c.appendChild(card);
             });
-        }
-        function getSeasonStats(site, season) {
-            if (!ARCTIC_DATA.length) return { brightness: 0, cloud: 0, daylight: 0 };
-            const relevantData = ARCTIC_DATA.filter(d => d.site === site && d.season === season);
-            if (relevantData.length === 0) return { brightness: 0, cloud: 0, daylight: 0 };
-            const avg = (field) => Math.round(relevantData.reduce((sum, d) => sum + d[field], 0) / relevantData.length * 10) / 10;
-            
-            return {
-                brightness: avg('brightnessIndex'),
-                cloud: avg('cloudCover'),
-                daylight: avg('daylightHours')
-            };
-        }
-        function getSkyColor(t, season) {
-            if(season === "Winter") {
-                 const distFromNoon = Math.abs(12 - t);
-                 const lightness = Math.max(5, 20 - distFromNoon * 2);
-                 return `hsl(220, 60%, ${lightness}%)`;
-            }
-            if(season === "Summer") {
-                const distFromNoon = Math.abs(12 - t);
-                const lightness = 80 - (distFromNoon * 2); 
-                return `hsl(190, 80%, ${Math.max(40, lightness)}%)`;
-            }
-            if (t < 5 || t > 19) return `hsl(220, 80%, 10%)`;
-            if (t < 7 || t > 17) return `hsl(20, 70%, 60%)`;
-            return `hsl(195, 90%, 70%)`;
-        }
-        function render() {
-            if (!ARCTIC_DATA.length) return;
-            const stats = getSeasonStats(state.location, state.season);
-            updateGauge(brightGauge, stats.brightness, 100);
-            updateGauge(cloudGauge, stats.cloud, 100);
-            document.getElementById("val-brightness").innerText = stats.brightness;
-            document.getElementById("val-cloud").innerText = stats.cloud + "%";
-            document.getElementById("val-daylight").innerText = stats.daylight + "h";
-            const t = state.currentTime;
-            const skyColor = getSkyColor(t, state.season);
-            document.getElementById("app-container").style.backgroundColor = skyColor;
-            let rotation = (t / 24) * 360 - 90;
-            const sun = document.getElementById("celestial-body");
-            sun.style.opacity = stats.daylight < 1 ? 0.2 : 1;
-            sun.style.transform = `rotate(${rotation}deg)`;
-            updateCloudsDensity(stats.cloud);
-            const h = Math.floor(t);
-            const m = Math.floor((t - h) * 60);
-            document.getElementById("time-display").innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-            updateStars(h, state.season);
-            updateTooltips(h);
-        }
 
-        // Tooltip functions
-        let tooltipTimer;
-        let currentTooltip = null;
-        let lastTooltipKey = null;
-        function showTooltip(text, posClass, key) {
-            if (lastTooltipKey === key) return; 
-            const container = document.getElementById("tooltip-container");
-            if (currentTooltip) {
-                currentTooltip.classList.replace("visible", "hidden");
-                clearTimeout(tooltipTimer);
-                setTimeout(() => currentTooltip?.remove(), 1500);
-            }
-            const div = document.createElement("div");
-            div.className = `absolute bg-black/80 backdrop-blur-md border border-yellow-400/30 text-yellow-50 p-4 rounded-lg shadow-2xl tooltip hidden ${posClass}`;
-            div.innerHTML = `
-                <div class="flex items-start space-x-3">
-                    <i data-lucide="info" class="text-yellow-400 shrink-0 w-4 h-4 mt-1"></i>
-                    <p class="text-sm leading-relaxed">${text}</p>
-                </div>
-            `;
-            container.appendChild(div);
-            lucide.createIcons();
-            requestAnimationFrame(() => div.classList.replace("hidden", "visible"));
-            currentTooltip = div;
-            lastTooltipKey = key;
-            tooltipTimer = setTimeout(() => {
-            div.classList.replace("visible", "hidden");
-            setTimeout(() => {
-                    if (currentTooltip === div) currentTooltip = null;
-                    div.remove();
-                }, 500);
-            }, 3000);
-        }
+            // Add guessing games
+            GUESSING_GAMES.forEach((g,i)=>{
+                const card=document.createElement("div");
+                card.className="quiz-card rounded-xl p-6 fade-in relative overflow-hidden";
+                card.style.transitionDelay=`${(QUIZ_QUESTIONS.length+i)*0.1}s`;
+                const gameId=`guess-${i}`;
+                card.innerHTML=`
+                    <div class="flex items-start space-x-4 mb-4 relative z-10">
+                        <div class="p-3 bg-blue-500/20 rounded-lg">
+                            <i data-lucide="${g.icon}" class="w-6 h-6 text-blue-300"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-white mb-2">${g.title}</h3>
+                            <p class="text-blue-200/80 mb-4">${g.question}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mb-3 relative z-10">
+                        <input type="number" id="${gameId}-input" class="guess-input flex-1 px-4 py-2 rounded-lg text-white text-center text-lg" placeholder="Your guess">
+                        <span class="text-blue-200 self-center">${g.unit}</span>
+                    </div>
+                    <button class="reveal-btn w-full py-2 px-4 bg-blue-500/30 hover:bg-blue-500/50 rounded-lg text-white font-bold border border-blue-400/50 relative z-10" 
+                            data-game="${i}">
+                        Check Answer
+                    </button>
+                    <div id="${gameId}-result" class="hidden mt-4 p-3 rounded-lg relative z-10"></div>
+                    <p class="text-xs text-blue-300/60 mt-2 relative z-10">💡 Hint: ${g.hint}</p>
+                `;
+                c.appendChild(card);
+            });
 
-        function updateTooltips(hour) {
-            let key = `${state.season}-${hour}`;
-            if (hour === 0) {
-                if (state.season === "Summer") {
-                    showTooltip(
-                        "The Midnight Sun. In the Arctic summer, the sun never fully sets.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                } else if (state.season === "Winter") {
-                    showTooltip(
-                        "Polar Night. In winter, the sun stays below the horizon.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                } else if (state.season === "Spring") {
-                    showTooltip(
-                        "Midnight in spring. Daylight increases as the Arctic moves toward summer.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                } else if (state.season === "Fall") {
-                    showTooltip(
-                    "Midnight in fall. Daylight decreases as the Arctic moves toward winter.",
-                    "top-0 left-1/2 -translate-x-1/2",
-                    key
-                    );
-                }
-            }
-            if (hour === 12) {
-                if (state.season === "Winter") {
-                    showTooltip(
-                        "Even at noon during Polar Night, the sun barely rises above the horizon.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                } else if (state.season === "Summer") {
-                    showTooltip(
-                        "Noon under the Midnight Sun. The sun is high and the Arctic experiences continuous daylight.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                } else {
-                    showTooltip(
-                        "Noon. Maximum daily brightness.",
-                        "top-0 left-1/2 -translate-x-1/2",
-                        key
-                    );
-                }
-            }
-            if ((hour === 6 || hour === 18) && state.season !== "Summer" && state.season !== "Winter") {
-                showTooltip(
-                    hour === 6
-                        ? "Sunrise. The Arctic landscape begins to brighten."
-                        : "Sunset. The Arctic landscape starts to darken.",
-                    "top-0 left-1/2 -translate-x-1/2",
-                    key
-                );
-            }
-        const stats = getSeasonStats(state.location, state.season);
-            if (hour === 9 && stats.cloud > 60) {
-                showTooltip(
-                    "Morning clouds are dense, reducing surface brightness.",
-                    "top-0 left-1/2 -translate-x-1/2",
-                    key
-                );
-            }
-            if (hour === 15 && stats.brightness > 80) {
-                showTooltip(
-                    "Afternoon sun is strong, increasing surface brightness.",
-                    "top-0 left-1/2 -translate-x-1/2",
-                    key
-                );
-            }
-        }
-
-        let scrollPauseTimer;
-        window.addEventListener('scroll', () => {
-        const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-        state.scrollProgress = Math.min(Math.max(window.scrollY / totalHeight, 0), 1);
-        state.currentTime = state.scrollProgress * 24;
-        const hint = document.getElementById("scroll-hint");
-        hint.style.opacity = state.scrollProgress > 0.05 ? 0 : 1;
-        render();
-        clearTimeout(scrollPauseTimer);
-        scrollPauseTimer = setTimeout(() => {
-            updateTooltips(Math.floor(state.currentTime));
-            }, 500);
-        });
-
-        window.addEventListener('scroll', () => {
-            const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-            const progress = window.scrollY / totalHeight;
-            state.scrollProgress = Math.min(Math.max(progress, 0), 1);
-            state.currentTime = state.scrollProgress * 24;
-            const hint = document.getElementById("scroll-hint");
-            if(state.scrollProgress > 0.05) hint.style.opacity = 0;
-            else hint.style.opacity = 1;
-            render();
-        });
-        
-        
-        // Star functions
-        function generateStars() {
-            const layer = document.getElementById("stars-layer");
-            layer.innerHTML = "";
-            starsArray = [];
-            for(let i=0; i<50; i++) {
-                const star = document.createElement("div");
-                star.className = "absolute bg-white rounded-full star";
-                star.style.top = Math.random() * 100 + "%";
-                star.style.left = Math.random() * 100 + "%";
-                const size = Math.random() * 3 + "px";
-                star.style.width = size;
-                star.style.height = size;
-                star.style.animationDelay = Math.random() * 3 + "s";
-                layer.appendChild(star);
-            }
-        }
-        function updateStars(hour, season) {
-            const starsLayer = document.getElementById("stars-layer");
-            if (season === "Summer") {
-                starsLayer.style.opacity = (hour < 1 || hour > 23) ? 0.05 : 0;
-            } else {
-                let nightFactor = 0;
-                if (hour >= 18) nightFactor = (hour - 18) / 6;   
-                else if (hour < 6) nightFactor = (6 - hour) / 6;
-                nightFactor = Math.min(Math.max(nightFactor, 0), 1);
-                starsLayer.style.opacity = nightFactor;
-                starsArray.forEach(star => {
-                    star.style.opacity = 0.3 + 0.7 * nightFactor * Math.random();
+            // Add event listeners for quizzes
+            document.querySelectorAll('.quiz-option').forEach(btn=>{
+                btn.addEventListener('click', function(){
+                    const quizId=parseInt(this.dataset.quiz);
+                    const optionId=parseInt(this.dataset.option);
+                    handleQuizAnswer(quizId, optionId, this);
                 });
+            });
+
+            // Add event listeners for guessing games
+            document.querySelectorAll('[data-game]').forEach(btn=>{
+                btn.addEventListener('click', function(){
+                    const gameId=parseInt(this.dataset.game);
+                    handleGuessAnswer(gameId);
+                });
+            });
+
+            lucide.createIcons();
+        }
+
+        function handleQuizAnswer(quizId, optionId, buttonElement){
+            const quiz=QUIZ_QUESTIONS[quizId];
+            const resultDiv=document.getElementById(`quiz-${quizId}-result`);
+            const options=document.querySelectorAll(`[data-quiz="${quizId}"]`);
+
+            // Disable all options
+            options.forEach(opt=>{
+                opt.disabled=true;
+                opt.classList.remove('selected');
+            });
+
+            // Mark selected
+            buttonElement.classList.add('selected');
+
+            // Show result
+            resultDiv.classList.remove('hidden');
+            if(optionId===quiz.correct){
+                resultDiv.className="mt-4 p-3 rounded-lg bg-green-500/20 border border-green-400/50";
+                resultDiv.innerHTML=`<p class="text-green-300 font-bold">✓ Correct!</p><p class="text-green-200/80 text-sm mt-1">${quiz.explanation}</p>`;
+                buttonElement.classList.add('correct');
+            } else {
+                resultDiv.className="mt-4 p-3 rounded-lg bg-red-500/20 border border-red-400/50";
+                resultDiv.innerHTML=`<p class="text-red-300 font-bold">✗ Incorrect</p><p class="text-red-200/80 text-sm mt-1">${quiz.explanation}</p>`;
+                buttonElement.classList.add('incorrect');
+                // Highlight correct answer
+                options[quiz.correct].classList.add('correct');
+            }
+        }
+
+        function handleGuessAnswer(gameId){
+            const game=GUESSING_GAMES[gameId];
+            const input=document.getElementById(`guess-${gameId}-input`);
+            const resultDiv=document.getElementById(`guess-${gameId}-result`);
+            const guess=parseFloat(input.value);
+
+            if(!guess || isNaN(guess)){
+                resultDiv.className="mt-4 p-3 rounded-lg bg-yellow-500/20 border border-yellow-400/50";
+                resultDiv.innerHTML=`<p class="text-yellow-300">Please enter a number!</p>`;
+                resultDiv.classList.remove('hidden');
+                return;
+            }
+
+            resultDiv.classList.remove('hidden');
+            const diff=Math.abs(guess-game.answer);
+            const percentDiff=(diff/game.answer)*100;
+
+            if(percentDiff<5){
+                resultDiv.className="mt-4 p-3 rounded-lg bg-green-500/20 border border-green-400/50";
+                resultDiv.innerHTML=`<p class="text-green-300 font-bold">🎉 Excellent! You're very close!</p><p class="text-green-200/80 text-sm mt-1">The answer is ${game.answer} ${game.unit}</p>`;
+            } else if(percentDiff<15){
+                resultDiv.className="mt-4 p-3 rounded-lg bg-blue-500/20 border border-blue-400/50";
+                resultDiv.innerHTML=`<p class="text-blue-300 font-bold">👍 Good guess!</p><p class="text-blue-200/80 text-sm mt-1">The answer is ${game.answer} ${game.unit}. You were ${diff.toFixed(1)} ${game.unit} off.</p>`;
+            } else if(guess<game.answer){
+                resultDiv.className="mt-4 p-3 rounded-lg bg-yellow-500/20 border border-yellow-400/50";
+                resultDiv.innerHTML=`<p class="text-yellow-300 font-bold">📈 Too low! Try a higher number.</p><p class="text-yellow-200/80 text-sm mt-1">The answer is ${game.answer} ${game.unit}</p>`;
+            } else {
+                resultDiv.className="mt-4 p-3 rounded-lg bg-yellow-500/20 border border-yellow-400/50";
+                resultDiv.innerHTML=`<p class="text-yellow-300 font-bold">📉 Too high! Try a lower number.</p><p class="text-yellow-200/80 text-sm mt-1">The answer is ${game.answer} ${game.unit}</p>`;
+            }
+        }
+
+        function initializeSeasonalFacts(){
+            const container = document.getElementById("seasonal-facts-container");
+            if(!container) return;
+            container.innerHTML = '';
+            
+            SEASONS.forEach((season, seasonIndex) => {
+                const seasonData = SEASONAL_FACTS[season];
+                if(!seasonData) return;
+                
+                // Create season section
+                const seasonSection = document.createElement("div");
+                seasonSection.className = "mb-16 fade-in";
+                seasonSection.style.transitionDelay = `${seasonIndex * 0.2}s`;
+                
+                // Get daylight hours from data if available
+                let daylightHours = seasonData.daylightHours;
+                if(ARCTIC_DATA.length > 0) {
+                    const seasonDataPoints = ARCTIC_DATA.filter(d => d.season === season && d.site === state.location);
+                    if(seasonDataPoints.length > 0) {
+                        const minDaylight = Math.min(...seasonDataPoints.map(d => d.daylightHours));
+                        const maxDaylight = Math.max(...seasonDataPoints.map(d => d.daylightHours));
+                        daylightHours = `${minDaylight.toFixed(1)}-${maxDaylight.toFixed(1)} hours`;
+                    }
+                }
+                
+                seasonSection.innerHTML = `
+                    <div class="text-center mb-8">
+                        <h3 class="text-3xl md:text-4xl font-black text-white mb-2">${season.toUpperCase()}</h3>
+                        <div class="flex items-center justify-center gap-4 mb-3">
+                            <div class="flex items-center gap-2 px-4 py-2 bg-blue-500/20 rounded-full border border-blue-400/30">
+                                <i data-lucide="sun" class="w-5 h-5 text-yellow-300"></i>
+                                <span class="text-blue-200 font-semibold">${daylightHours}</span>
+                            </div>
+                        </div>
+                        <p class="text-blue-200/80 text-lg max-w-2xl mx-auto">${seasonData.description}</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="facts-${season.toLowerCase()}"></div>
+                `;
+                
+                container.appendChild(seasonSection);
+                
+                // Add facts for this season
+                const factsGrid = document.getElementById(`facts-${season.toLowerCase()}`);
+                seasonData.facts.forEach((f, factIndex) => {
+                    const card = document.createElement("div");
+                    card.className = "fact-card bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-6 fade-in relative overflow-hidden";
+                    card.style.transitionDelay = `${(seasonIndex * 0.2) + (factIndex * 0.1)}s`;
+                    
+                    if(f.isReveal){
+                        card.innerHTML = `
+                            <div class="flex items-start space-x-4 mb-4 relative z-10">
+                                <div class="p-3 bg-blue-500/20 rounded-lg">
+                                    <i data-lucide="${f.icon}" class="w-6 h-6 text-blue-300"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-white mb-1">${f.title}</h3>
+                                </div>
+                            </div>
+                            <div class="mb-3 px-3 py-2 bg-yellow-500/10 border border-yellow-400/20 rounded-lg">
+                                <p class="text-xs text-yellow-200/80 font-medium">${f.daylightConnection}</p>
+                            </div>
+                            <button class="reveal-btn w-full py-2 px-4 bg-blue-500/30 hover:bg-blue-500/50 rounded-lg text-white font-bold border border-blue-400/50 mb-3 relative z-10" 
+                                    onclick="this.nextElementSibling.classList.toggle('revealed'); this.style.display='none';">
+                                👆 Click to Reveal Fact
+                            </button>
+                            <div class="hidden-content relative z-10">
+                                <p class="text-blue-100/80 leading-relaxed">${f.content}</p>
+                            </div>
+                        `;
+                    } else {
+                        card.innerHTML = `
+                            <div class="flex items-start space-x-4 mb-4 relative z-10">
+                                <div class="p-3 bg-blue-500/20 rounded-lg">
+                                    <i data-lucide="${f.icon}" class="w-6 h-6 text-blue-300"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-white mb-1">${f.title}</h3>
+                                </div>
+                            </div>
+                            <div class="mb-3 px-3 py-2 bg-yellow-500/10 border border-yellow-400/20 rounded-lg">
+                                <p class="text-xs text-yellow-200/80 font-medium">${f.daylightConnection}</p>
+                            </div>
+                            <p class="text-blue-100/80 leading-relaxed relative z-10">${f.content}</p>
+                        `;
+                    }
+                    factsGrid.appendChild(card);
+                });
+            });
+            
+            lucide.createIcons();
+            
+            // Animate cards on scroll
+            setTimeout(()=>{
+                document.querySelectorAll('#facts-section .fade-in')
+                    .forEach(e=>e.classList.add('visible'));
+            },100);
+        }
+        
+        // Old function removed - using initializeSeasonalFacts instead
+
+        function getSeasonStats(site,season){
+            if(!ARCTIC_DATA.length)return{brightness:0,cloud:0,daylight:0};
+            const d=ARCTIC_DATA.filter(x=>x.site===site && x.season===season);
+            if(!d.length)return{brightness:0,cloud:0,daylight:0};
+            const avg=f=>Math.round(d.reduce((s,x)=>s+x[f],0)/d.length*10)/10;
+            return{brightness:avg('brightnessIndex'),cloud:avg('cloudCover'),daylight:avg('daylightHours')};
+        }
+
+        function getSkyColor(t,season){
+            if(season==="Winter"){
+                const d=Math.abs(12-t); return `hsl(220,60%,${Math.max(5,20-d*2)}%)`;
+            }
+            if(season==="Summer"){
+                const d=Math.abs(12-t); return `hsl(190,80%,${Math.max(40,80-d*2)}%)`;
+            }
+            if(t<5||t>19)return"hsl(220,80%,10%)";
+            if(t<7||t>17)return"hsl(20,70%,60%)";
+            return"hsl(195,90%,70%)";
+        }
+
+        function render(){
+            if(!ARCTIC_DATA.length)return;
+
+            const stats=getSeasonStats(state.location,state.season);
+            updateGauge(brightGauge,stats.brightness,100);
+            updateGauge(cloudGauge,stats.cloud,100);
+
+            document.getElementById("val-brightness").innerText=stats.brightness;
+            document.getElementById("val-cloud").innerText=stats.cloud+"%";
+            document.getElementById("val-daylight").innerText=stats.daylight+"h";
+
+            const t=state.currentTime;
+            document.getElementById("app-container").style.backgroundColor=getSkyColor(t,state.season);
+
+            const rot=(t/24)*360-90;
+            const sun=document.getElementById("celestial-body");
+            sun.style.opacity=stats.daylight<1?0.2:1;
+            sun.style.transform=`rotate(${rot}deg)`;
+
+            updateCloudsDensity(stats.cloud);
+
+            const h=Math.floor(t);
+            const m=Math.floor((t-h)*60);
+            document.getElementById("time-display").innerText=
+                `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+            updateStars(h,state.season);
+        }
+
+        function handleScroll(){
+            const y=window.scrollY;
+            const h=window.innerHeight;
+
+            const intro=document.getElementById('intro-section').offsetHeight;
+            const hook=document.getElementById('hook-section')?.offsetHeight || 0;
+            const vis=document.getElementById('visualization-section');
+            const vH=vis.offsetHeight;
+
+            // Animate icebergs as you scroll
+            const icebergsContainer = document.getElementById('icebergs-container');
+            if(icebergsContainer){
+                if(y < intro){
+                    // In intro section - show icebergs normally
+                    const introProgress = Math.min(y / intro, 1);
+                    icebergsContainer.style.opacity = 1 - introProgress * 0.3;
+                    icebergsContainer.style.transform = `translateY(${introProgress * 50}px)`;
+                } else if(y < intro + hook){
+                    // In hook section - continue fading
+                    const hookProgress = Math.min((y - intro) / hook, 1);
+                    icebergsContainer.style.opacity = 0.7 - hookProgress * 0.7;
+                    icebergsContainer.style.transform = `translateY(${50 + hookProgress * 100}px) scale(${1 - hookProgress * 0.2})`;
+                } else {
+                    // Past hook section - hide icebergs
+                    icebergsContainer.style.opacity = 0;
+                }
+            }
+
+            // Animate map zoom in hook section (less sensitive)
+            if(y >= intro && y < intro + hook){
+                const hookStart = intro;
+                const hookPos = y - hookStart;
+                const hookScrollH = hook - h;
+                // Calculate progress - will complete at end of section
+                const hookProg = Math.min(Math.max(hookPos / hookScrollH, 0), 1);
+                
+                const mapSvg = document.getElementById('arctic-map');
+                const locationMarker = document.getElementById('location-marker');
+                const alaskaLabel = document.getElementById('alaska-label');
+                const cityLabel = document.getElementById('city-label');
+                const mapTitle = document.getElementById('map-title');
+                const mapDescription = document.getElementById('map-description');
+                const mapReason = document.getElementById('map-reason');
+                
+                if(mapSvg){
+                    // Ensure blur overlay is hidden in phases 1 and 2
+                    const blurOverlay = document.getElementById('map-blur-overlay');
+                    if(blurOverlay && hookProg < 0.75) {
+                        blurOverlay.style.opacity = 0;
+                        blurOverlay.style.pointerEvents = 'none';
+                    }
+                    
+                    // Smooth zoom from world to Utqiagvik
+                    // Use projected coordinates if available, otherwise fallback to hardcoded
+                    let centerX, centerY;
+                    if(mapProjection && utqiagvikCoords) {
+                        const [x, y] = mapProjection(utqiagvikCoords);
+                        centerX = x;
+                        centerY = y;
+                    } else {
+                        centerX = 1300; // Fallback Utqiagvik X position
+                        centerY = 500; // Fallback Utqiagvik Y position
+                    }
+                    
+                    // Alaska center (approximate)
+                    const alaskaCenter = [-150, 65];
+                    let alaskaCenterX, alaskaCenterY;
+                    if(mapProjection) {
+                        const [ax, ay] = mapProjection(alaskaCenter);
+                        alaskaCenterX = ax;
+                        alaskaCenterY = ay;
+                    } else {
+                        alaskaCenterX = 1000; // Fallback
+                        alaskaCenterY = 500; // Fallback
+                    }
+                    
+                    // Use easing function for smoother transitions
+                    const easeInOut = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+                    const easedProg = easeInOut(hookProg);
+                    
+                    let viewBox;
+                    let currentCenterX, currentCenterY, zoom;
+                    
+                    if(hookProg < 0.50){
+                        // Phase 1: Zoom from world to Alaska
+                        const phase1Prog = hookProg / 0.50;
+                        const easedPhase1 = easeInOut(phase1Prog);
+                        zoom = 1 + easedPhase1 * 3; // Smooth zoom from 1x to 4x
+                        
+                        // Interpolate center from world center to Alaska center
+                        currentCenterX = 1800 + (alaskaCenterX - 1800) * easedPhase1;
+                        currentCenterY = 900 + (alaskaCenterY - 900) * easedPhase1;
+                        
+                        const width = 3600 / zoom;
+                        const height = 1800 / zoom;
+                        viewBox = `${currentCenterX - width/2} ${currentCenterY - height/2} ${width} ${height}`;
+                        
+                        // Hide Alaska label
+                        if(alaskaLabel) alaskaLabel.setAttribute('opacity', 0);
+                        
+                        // Ensure text overlay is visible in phase 1
+                        const mapTextOverlay = document.getElementById('map-text-overlay');
+                        if(mapTextOverlay) {
+                            mapTextOverlay.style.opacity = 1;
+                            mapTextOverlay.style.visibility = 'visible';
+                        }
+                        
+                        if(phase1Prog < 0.3){
+                            if(mapTitle) mapTitle.textContent = "WHERE IN THE ARCTIC?";
+                            if(mapDescription) mapDescription.textContent = "We're exploring the Arctic region, home to polar bears and extreme seasonal changes.";
+                        } else {
+                            if(mapTitle) mapTitle.textContent = "ALASKA";
+                            if(mapDescription) mapDescription.textContent = "Zooming into Alaska, the largest state in the United States.";
+                        }
+                    } else if(hookProg < 0.60){
+                        // Phase 2: Zoom from Alaska to Utqiagvik - complete zoom to yellow dot
+                        const phase2Prog = (hookProg - 0.50) / 0.10;
+                        const easedPhase2 = easeInOut(phase2Prog);
+                        zoom = 4 + easedPhase2 * 11; // Smooth zoom from 4x to 15x
+                        
+                        // Interpolate center from Alaska center to Utqiagvik
+                        currentCenterX = alaskaCenterX + (centerX - alaskaCenterX) * easedPhase2;
+                        currentCenterY = alaskaCenterY + (centerY - alaskaCenterY) * easedPhase2;
+                        
+                        const width = 3600 / zoom;
+                        const height = 1800 / zoom;
+                        viewBox = `${currentCenterX - width/2} ${currentCenterY - height/2} ${width} ${height}`;
+                        
+                        // Hide both labels
+                        if(alaskaLabel) alaskaLabel.setAttribute('opacity', 0);
+                        if(cityLabel) cityLabel.setAttribute('opacity', 0);
+                        
+                        // Show Utqiagvik text early
+                        if(phase2Prog > 0.2){
+                            if(mapTitle) mapTitle.textContent = "UTQIAGVIK, ALASKA";
+                            if(mapDescription) mapDescription.textContent = "The northernmost city in the United States, located 320 miles north of the Arctic Circle.";
+                        }
+                        
+                        // Keep Utqiagvik text fully visible during zoom
+                        const mapTextOverlay = document.getElementById('map-text-overlay');
+                        if(mapTextOverlay) {
+                            mapTextOverlay.style.opacity = 1;
+                            mapTextOverlay.style.visibility = 'visible';
+                        }
+                        
+                        // Ensure blur overlay is completely hidden during phase 2
+                        const blurOverlayPhase2 = document.getElementById('map-blur-overlay');
+                        if(blurOverlayPhase2) {
+                            blurOverlayPhase2.style.opacity = 0;
+                            blurOverlayPhase2.style.visibility = 'hidden';
+                        }
+                    } else if(hookProg < 0.75){
+                        // Phase 2b: Hold at yellow dot with Utqiagvik text still visible
+                        zoom = 15;
+                        currentCenterX = centerX;
+                        currentCenterY = centerY;
+                        const width = 3600 / zoom;
+                        const height = 1800 / zoom;
+                        viewBox = `${currentCenterX - width/2} ${currentCenterY - height/2} ${width} ${height}`;
+                        
+                        // Keep Utqiagvik text visible while at yellow dot
+                        const mapTextOverlay = document.getElementById('map-text-overlay');
+                        if(mapTextOverlay) {
+                            mapTextOverlay.style.opacity = 1;
+                            mapTextOverlay.style.visibility = 'visible';
+                            if(mapTitle) mapTitle.textContent = "UTQIAGVIK, ALASKA";
+                            if(mapDescription) mapDescription.textContent = "The northernmost city in the United States, located 320 miles north of the Arctic Circle.";
+                        }
+                        
+                        // Ensure blur overlay is still hidden
+                        const blurOverlayPhase2b = document.getElementById('map-blur-overlay');
+                        if(blurOverlayPhase2b) {
+                            blurOverlayPhase2b.style.opacity = 0;
+                            blurOverlayPhase2b.style.visibility = 'hidden';
+                        }
+                    } else if(hookProg < 0.85){
+                        // Phase 2c: Fade out Utqiagvik text and fade in blur overlay
+                        const transitionProg = (hookProg - 0.75) / 0.10;
+                        
+                        // Keep zoomed in view
+                        zoom = 15;
+                        currentCenterX = centerX;
+                        currentCenterY = centerY;
+                        const width = 3600 / zoom;
+                        const height = 1800 / zoom;
+                        viewBox = `${currentCenterX - width/2} ${currentCenterY - height/2} ${width} ${height}`;
+                        
+                        // Fade out Utqiagvik text
+                        const mapTextOverlay = document.getElementById('map-text-overlay');
+                        if(mapTextOverlay) {
+                            mapTextOverlay.style.opacity = Math.max(0, 1 - transitionProg);
+                        }
+                        
+                        // Fade in blur overlay
+                        const blurOverlay = document.getElementById('map-blur-overlay');
+                        if(blurOverlay) {
+                            blurOverlay.style.visibility = 'visible';
+                            blurOverlay.style.opacity = transitionProg;
+                        }
+                    } else {
+                        // Phase 3: Hold with "This location..." text fully visible
+                        // Extended phase 3 (from 0.85 to 1.0 = 15% of scroll) - text already fully faded in
+                        zoom = 15;
+                        currentCenterX = centerX;
+                        currentCenterY = centerY;
+                        const width = 3600 / zoom;
+                        const height = 1800 / zoom;
+                        viewBox = `${currentCenterX - width/2} ${currentCenterY - height/2} ${width} ${height}`;
+                        
+                        // Ensure main text overlay is completely hidden
+                        const mapTextOverlay = document.getElementById('map-text-overlay');
+                        if(mapTextOverlay) {
+                            mapTextOverlay.style.opacity = 0;
+                            mapTextOverlay.style.visibility = 'hidden';
+                        }
+                        
+                        // Keep blur overlay fully visible
+                        const blurOverlay = document.getElementById('map-blur-overlay');
+                        if(blurOverlay) {
+                            blurOverlay.style.visibility = 'visible';
+                            blurOverlay.style.opacity = 1;
+                        }
+                    }
+                    
+                    // Apply viewBox with requestAnimationFrame for smoother updates
+                    requestAnimationFrame(() => {
+                        mapSvg.setAttribute('viewBox', viewBox);
+                    });
+                }
+            }
+
+            if(y < intro){
+                state.currentSection='intro';
+            } else if(y < intro + hook){
+                state.currentSection='hook';
+            } else if(y < intro + hook + vH){
+                state.currentSection='visualization';
+
+                const start=intro + hook;
+                const pos=y-start;
+                const scrollH=vH-h;
+                // Calculate progress - will complete at end of section
+                const prog=Math.min(Math.max(pos/scrollH, 0), 1);
+                state.scrollProgress=prog;
+                state.currentTime=prog*24;
+
+                // Update time display and progress bar
+                updateYearProgress();
+                updateYearProgressBar(prog);
+                
+                // Make visualization visible
+                const appContainer = document.getElementById("app-container");
+                if (pos > 50) {
+                    appContainer.style.opacity = 1;
+                }
+
+                render();
+            }
+        }
+
+
+        function updateYearProgress(){
+            const el=document.getElementById("year-season");
+            if(state.currentSection==='visualization'){
+                const h=Math.floor(state.currentTime);
+                const m=Math.floor((state.currentTime%1)*60);
+                el.textContent=`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+            } else el.textContent=state.season;
+        }
+
+        function updateYearProgressBar(p){
+            document.getElementById("year-progress-bar").style.width=`${p*100}%`;
+        }
+
+        function generateStars(){
+            const l=document.getElementById("stars-layer");
+            if(!l) return;
+            l.innerHTML="";
+            for(let i=0;i<50;i++){
+                const d=document.createElement("div");
+                d.className="absolute bg-white rounded-full star";
+                d.style.top=Math.random()*100+"%";
+                d.style.left=Math.random()*100+"%";
+                const s=Math.random()*3+"px";
+                d.style.width=s; d.style.height=s;
+                d.style.animationDelay=Math.random()*3+"s";
+                l.appendChild(d);
             }
         }
         generateStars();
 
-        const modal = document.getElementById("info-modal");
-        const openBtn = document.getElementById("info-btn");
-        const closeBtn = document.getElementById("close-modal-btn");
-
-        openBtn.addEventListener("click", () => {
-            modal.classList.remove("hidden-modal");
-            modal.classList.add("visible-modal");
-        });
-
-        closeBtn.addEventListener("click", () => {
-            modal.classList.remove("visible-modal");
-            modal.classList.add("hidden-modal");
-        });
-
-        
-        lucide.createIcons();
-        d3.json("modis_arctic_2023.json")
-          .then(data => {
-              ARCTIC_DATA = data;
-              LOCATIONS = [...new Set(ARCTIC_DATA.map(d => d.site))];
-              console.log("Data loaded successfully:", ARCTIC_DATA.length, "rows");
-              initializeUI();
-          })
-          .catch(error => {
-              console.error("Error loading JSON:", error);
-              const loader = document.getElementById("loading-screen");
-              loader.innerHTML = `
-                <div class="text-red-400 text-center p-4 max-w-md">
-                    <div class="mb-4 flex justify-center"><i data-lucide="alert-triangle" class="w-10 h-10"></i></div>
-                    <p class="font-bold text-lg mb-2">Data Loading Failed</p>
-                    <p class="text-sm text-gray-300">The application could not load <code>modis_arctic_2023.json</code>.</p>
-                    <div class="mt-4 bg-black/40 p-3 rounded text-left text-xs font-mono text-gray-400">
-                        <p class="mb-1 text-yellow-400 font-bold">Possible Fixes:</p>
-                        <ul class="list-disc pl-4 space-y-1">
-                            <li>Ensure the JSON file is in the same folder as this HTML file.</li>
-                            <li>You must run this via a <strong>Local Server</strong> (e.g., Live Server in VS Code) or <strong>GitHub Pages</strong>.</li>
-                            <li>Browser security blocks reading files directly from disk (file://).</li>
-                        </ul>
-                    </div>
-                </div>
-              `;
-              lucide.createIcons();
-
-          });
-
-        // Cloud functions
-        let cloudsArray = [];
-        let cloudTargetPercent = 50;
-        function generateClouds(initialPercent = 50) {
-            const layer = document.getElementById("clouds-layer");
-            layer.innerHTML = '';
-            cloudsArray = [];
-            cloudTargetPercent = initialPercent;    
-            const norm = normalizeCloudPercent(cloudTargetPercent);
-            const {numClouds} = getCloudCount(norm);
-
-            for (let i = 0; i < numClouds; i++) {
-                const cloud = createCloud(norm);
-                layer.appendChild(cloud);
-                cloudsArray.push(cloud);
+        function updateStars(h,season){
+            const l=document.getElementById("stars-layer");
+            if(!l) return;
+            if(season==="Summer"){
+                l.style.opacity=(h<1||h>23)?0.05:0;
+            } else {
+                let n=0;
+                if(h>=18)n=(h-18)/6;
+                else if(h<6)n=(6-h)/6;
+                n=Math.min(Math.max(n,0),1);
+                l.style.opacity=n;
             }
         }
-        function createCloud(norm) {
-            const cloud = document.createElement("div");
-            cloud.className = "absolute cloud";
-            cloud.style.position = "absolute";
-            cloud.style.top = Math.random() * 70 + "%";
-            cloud.style.left = Math.random() * 100 + "%";
-            cloud.dataset.speed = (0.001 + Math.random() * 0.005) * (0.5 + norm);
-            cloud.style.opacity = 0.1 + norm * 0.6;
-            const numCircles = 5 + Math.floor(Math.random() * 3);
-            const baseWidth = 80 + Math.random() * 120;
-            const baseHeight = 60 + Math.random() * 40;
-            const mid = (numCircles - 1) / 2;
 
-            for (let j = 0; j < numCircles; j++) {
-                const circle = document.createElement("div");
-                const distanceFromMid = Math.abs(j - mid);
-                const sizeFactor = 1 - distanceFromMid / mid * 0.5;
-                const widthFactor = (0.8 + 0.4 * sizeFactor) * (0.9 + 0.1 * norm);
-                const heightFactor = (0.8 + 0.8 * sizeFactor) * (0.9 + 0.4 * norm);
-                const w = baseWidth * widthFactor * (0.9 + Math.random() * 0.2);
-                const h = baseHeight * heightFactor * (0.9 + Math.random() * 0.2);
-                circle.style.width = w + "px";
-                circle.style.height = h + "px";
-                circle.style.background = "white";
-                circle.style.borderRadius = "50%";
-                circle.style.position = "absolute";
-                circle.style.left = (j * baseWidth * 0.35) + "px";
-                const baseline = baseHeight;
-                const verticalOffset = baseline - h;
-                circle.style.top = verticalOffset + "px";
-                circle.style.filter = `blur(${2 + Math.random() * 3}px)`;
-                cloud.appendChild(circle);
+        let cloudsArray=[];
+        let cloudTargetPercent=50;
+
+        function generateClouds(p=50){
+            const l=document.getElementById("clouds-layer");
+            if(!l) return;
+            l.innerHTML="";
+            cloudsArray=[];
+            cloudTargetPercent=p;
+            const norm=normalizeCloudPercent(p);
+            const count=getCloudCount(norm).numClouds;
+            for(let i=0;i<count;i++){
+                const c=createCloud(norm);
+                l.appendChild(c);
+                cloudsArray.push(c);
             }
-            return cloud;
         }
-        let lastTime = Date.now();
-        function animateClouds() {
-            const now = Date.now();
-            const delta = (now - lastTime) / 16.67;
-            lastTime = now;
-            cloudsArray.forEach(cloud => {
-                let left = parseFloat(cloud.style.left);
-                left += parseFloat(cloud.dataset.speed) * delta;
-                if (left > 100) left = -cloud.offsetWidth / window.innerWidth * 100;
-                cloud.style.left = left + "%";
-            const scale = 0.95 + 0.1 * Math.sin(Date.now() / 2000);
-            cloud.style.transform = `scale(${scale})`;
-        });
+        generateClouds();
+
+        function createCloud(n){
+            const c=document.createElement("div");
+            c.className="absolute cloud";
+            c.style.top=Math.random()*70+"%";
+            c.style.left=Math.random()*100+"%";
+            c.dataset.speed=(0.001+Math.random()*0.005)*(0.5+n);
+            c.style.opacity=0.1+n*0.6;
+            const num=5+Math.floor(Math.random()*3);
+            const bw=80+Math.random()*120;
+            const bh=60+Math.random()*40;
+            const mid=(num-1)/2;
+            for(let j=0;j<num;j++){
+                const d=document.createElement("div");
+                const dist=Math.abs(j-mid);
+                const sf=1-dist/mid*0.5;
+                const wf=(0.8+0.4*sf)*(0.9+0.1*n);
+                const hf=(0.8+0.8*sf)*(0.9+0.4*n);
+                d.style.width=bw*wf*(0.9+Math.random()*0.2)+"px";
+                d.style.height=bh*hf*(0.9+Math.random()*0.2)+"px";
+                d.style.background="white";
+                d.style.borderRadius="50%";
+                d.style.position="absolute";
+                d.style.left=(j*bw*0.35)+"px";
+                d.style.top=(bh - bh*hf)+"px";
+                d.style.filter=`blur(${2+Math.random()*3}px)`;
+                c.appendChild(d);
+            }
+            return c;
+        }
+
+        function animateClouds(){
+            cloudsArray.forEach(c=>{
+                let x=parseFloat(c.style.left);
+                x+=parseFloat(c.dataset.speed);
+                if(x>100)x=-50;
+                c.style.left=x+"%";
+            });
             requestAnimationFrame(animateClouds);
         }
-        function updateCloudsDensity(cloudPercent) {
-            cloudTargetPercent = cloudPercent;
-            const norm = normalizeCloudPercent(cloudTargetPercent);
-            const {numClouds} = getCloudCount(norm);
-            cloudsArray.forEach(cloud => {
-                cloud.style.opacity = 0.1 + norm * 0.6;
-                cloud.dataset.speed = (0.001 + Math.random() * 0.005) * (0.5 + norm);
-            });
-            while (cloudsArray.length < numClouds) {
-                const cloud = createCloud(norm);
-                document.getElementById("clouds-layer").appendChild(cloud);
-                cloudsArray.push(cloud);
-            }
-            while (cloudsArray.length > numClouds) {
-                const cloud = cloudsArray.pop();
-                cloud.remove();
-            }
-        }
-        function normalizeCloudPercent(cloudPercent) {
-            const min = 45;
-            const max = 80;
-            return Math.min(Math.max((cloudPercent - min) / (max - min), 0), 1);
-        }
-        function getCloudCount(norm) {
-            const minClouds = 3;
-            const maxClouds = 20;
-            return { numClouds: Math.round(minClouds + norm * (maxClouds - minClouds)) };
-        }
-
-        generateClouds();
         animateClouds();
 
+        function normalizeCloudPercent(p){
+            const min=45,max=80;
+            return Math.min(Math.max((p-min)/(max-min),0),1);
+        }
+
+        function getCloudCount(n){
+            const min=3,max=20;
+            return{numClouds:Math.round(min+n*(max-min))};
+        }
+
+        function updateCloudsDensity(percent){
+            if(Math.abs(percent-cloudTargetPercent)>5){
+                generateClouds(percent);
+            }
+        }
+
+        const modal=document.getElementById("info-modal");
+        document.getElementById("info-btn").onclick=()=>{
+            modal.classList.remove("hidden-modal");
+            modal.classList.add("visible-modal");
+        };
+        document.getElementById("close-modal-btn").onclick=()=>{
+            modal.classList.remove("visible-modal");
+            modal.classList.add("hidden-modal");
+        };
+
+        function generateSnow(){
+            const container=document.getElementById("snow-container");
+            if(!container) return;
+            container.innerHTML="";
+            
+            const snowflakeSymbols = ['❄', '❅', '❆', '✻', '✼', '✽', '✾', '✿'];
+            
+            // Create more snowflakes for better effect
+            for(let i=0;i<150;i++){
+                const flake=document.createElement("div");
+                flake.className="snowflake";
+                flake.textContent=snowflakeSymbols[Math.floor(Math.random()*snowflakeSymbols.length)];
+                
+                // Vary sizes more
+                const size=Math.random()*1.2+0.3;
+                flake.style.fontSize=size+"em";
+                flake.style.left=Math.random()*100+"%";
+                flake.style.opacity=Math.random()*0.7+0.3;
+                
+                // Vary speeds - some fall faster, some slower
+                const duration=Math.random()*15+8;
+                // More horizontal drift for realistic wind effect
+                const drift=(Math.random()-0.5)*200;
+                flake.style.setProperty('--drift', drift+'px');
+                flake.style.animationDuration=duration+"s";
+                // Stagger start times so they don't all start at once
+                flake.style.animationDelay=Math.random()*duration+"s";
+                
+                container.appendChild(flake);
+            }
+        }
+        generateSnow();
+
+        window.addEventListener('scroll', handleScroll);
+
+        // Initialize D3 geographic map
+        let mapProjection, mapPath, mapSvgD3, utqiagvikCoords;
+        
+        function initializeMap(){
+            try {
+                mapSvgD3 = d3.select("#arctic-map");
+                const container = document.getElementById("map-container");
+                if(!container || !mapSvgD3.node()) {
+                    return;
+                }
+                
+                // Set up projection for 3600x1800 viewBox (matching the SVG)
+                const scale = 3600 / 6.5;
+                mapProjection = d3.geoNaturalEarth1()
+                    .scale(scale)
+                    .translate([1800, 900]);
+                
+                mapPath = d3.geoPath().projection(mapProjection);
+                
+                // Utqiagvik coordinates: 71.2906° N, 156.7886° W
+                utqiagvikCoords = [-156.7886, 71.2906];
+                
+                // Load world map data
+                if(typeof topojson !== 'undefined') {
+                    d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(world => {
+                        try {
+                            const countries = topojson.feature(world, world.objects.countries);
+                            
+                            // Clear existing simple paths and draw real countries
+                            mapSvgD3.select("#world-map").selectAll("*").remove();
+                            
+                            mapSvgD3.select("#world-map")
+                                .selectAll("path.country")
+                                .data(countries.features)
+                                .enter()
+                                .append("path")
+                                .attr("class", "country")
+                                .attr("d", mapPath)
+                                .attr("fill", "#1e3a8a")
+                                .attr("stroke", "#3b82f6")
+                                .attr("stroke-width", 1.5)
+                                .attr("opacity", 0.9);
+                            
+                            // Highlight Alaska (USA)
+                            mapSvgD3.select("#world-map")
+                                .selectAll("path.country")
+                                .filter(d => d.properties.NAME === "United States of America")
+                                .attr("fill", "#2563eb")
+                                .attr("stroke", "#60a5fa")
+                                .attr("stroke-width", 2)
+                                .attr("opacity", 0.95);
+                            
+                            // Polar bear hotspots around the world
+                            const polarBearHotspots = [
+                                { name: "Svalbard, Norway", coords: [15.64, 78.22] },
+                                { name: "Churchill, Canada", coords: [-94.17, 58.77] },
+                                { name: "Wrangel Island, Russia", coords: [-179.0, 71.24] },
+                                { name: "Greenland", coords: [-40.0, 72.0] },
+                                { name: "Banks Island, Canada", coords: [-121.5, 72.0] },
+                                { name: "Baffin Island, Canada", coords: [-70.0, 68.0] },
+                                { name: "Franz Josef Land, Russia", coords: [55.0, 80.0] },
+                                { name: "Novaya Zemlya, Russia", coords: [56.0, 75.0] }
+                            ];
+                            
+                            // Add polar bear hotspot markers
+                            const hotspotsGroup = mapSvgD3.select("#location-marker");
+                            polarBearHotspots.forEach(hotspot => {
+                                const [hx, hy] = mapProjection(hotspot.coords);
+                                if(hx && hy && !isNaN(hx) && !isNaN(hy)) {
+                                    const hotspotMarker = hotspotsGroup.append("g")
+                                        .attr("class", "polar-bear-hotspot");
+                                    
+                                    hotspotMarker.append("circle")
+                                        .attr("r", 8)
+                                        .attr("fill", "#60a5fa")
+                                        .attr("opacity", 0.8)
+                                        .attr("cx", hx)
+                                        .attr("cy", hy);
+                                    
+                                    hotspotMarker.append("circle")
+                                        .attr("r", 4)
+                                        .attr("fill", "#ffffff")
+                                        .attr("cx", hx)
+                                        .attr("cy", hy);
+                                }
+                            });
+                            
+                            // Add location marker at Utqiagvik (yellow, more prominent)
+                            const [x, y] = mapProjection(utqiagvikCoords);
+                            const marker = hotspotsGroup.append("g")
+                                .attr("class", "utqiagvik-marker");
+                            
+                            marker.append("circle")
+                                .attr("r", 12)
+                                .attr("fill", "#fbbf24")
+                                .attr("opacity", 0.9)
+                                .attr("cx", x)
+                                .attr("cy", y)
+                                .append("animate")
+                                .attr("attributeName", "r")
+                                .attr("values", "12;18;12")
+                                .attr("dur", "2s")
+                                .attr("repeatCount", "indefinite");
+                            
+                            marker.append("circle")
+                                .attr("r", 6)
+                                .attr("fill", "#ffffff")
+                                .attr("cx", x)
+                                .attr("cy", y);
+                            
+                            const pulseCircle = marker.append("circle")
+                                .attr("r", 30)
+                                .attr("fill", "none")
+                                .attr("stroke", "#fbbf24")
+                                .attr("stroke-width", 3)
+                                .attr("opacity", 0.5)
+                                .attr("cx", x)
+                                .attr("cy", y);
+                            
+                            pulseCircle.append("animate")
+                                .attr("attributeName", "r")
+                                .attr("values", "30;45;30")
+                                .attr("dur", "2s")
+                                .attr("repeatCount", "indefinite");
+                            
+                            pulseCircle.append("animate")
+                                .attr("attributeName", "opacity")
+                                .attr("values", "0.5;0;0.5")
+                                .attr("dur", "2s")
+                                .attr("repeatCount", "indefinite");
+                            
+                            // Hide labels
+                            mapSvgD3.select("#alaska-label")
+                                .attr("opacity", 0);
+                            
+                            mapSvgD3.select("#city-label")
+                                .attr("opacity", 0);
+                        } catch(e) {
+                            console.error("Error drawing map:", e);
+                        }
+                    }).catch(err => {
+                        console.error("Error loading map data:", err);
+                    });
+                }
+            } catch(e) {
+                console.error("Error initializing map:", e);
+            }
+        }
+        
+        // Initialize map after page loads
+        if(document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeMap);
+        } else {
+            setTimeout(initializeMap, 100);
+        }
+
+        // Using simple SVG map - no D3 initialization needed
+        
+        d3.json("modis_arctic_2023.json").then(data=>{
+            try {
+                ARCTIC_DATA=data;
+                LOCATIONS=[...new Set(data.map(d=>d.site))];
+                initializeUI();
+                handleScroll();
+                setTimeout(()=>{
+                    document.querySelectorAll('#intro-section .fade-in')
+                        .forEach(e=>e.classList.add('visible'));
+                },100);
+                
+                // Map is already initialized, just ensure it's updated
+                if(mapProjection && mapSvgD3) {
+                    // Map should already be loading/loaded
+                }
+            } catch(e) {
+                console.error("Error initializing UI:", e);
+                // Hide loading screen even on error
+                const loadingScreen = document.getElementById("loading-screen");
+                if(loadingScreen) {
+                    loadingScreen.style.opacity = 0;
+                    setTimeout(()=>{ loadingScreen.style.display='none'; },500);
+                }
+            }
+        }).catch(err => {
+            console.error("Error loading modis_arctic_2023.json:", err);
+            // Hide loading screen even on error
+            const loadingScreen = document.getElementById("loading-screen");
+            if(loadingScreen) {
+                loadingScreen.style.opacity = 0;
+                setTimeout(()=>{ loadingScreen.style.display='none'; },500);
+            }
+        });
     </script>
 </body>
 </html>
